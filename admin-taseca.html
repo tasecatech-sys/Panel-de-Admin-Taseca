@@ -494,12 +494,17 @@ const ICONS = {
 const SUPABASE_URL = 'https://mzxyqkbhrcegiyqbbazp.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_71sDgXwdaGSomzG2U24vkw_1N4JWhF-';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-const APP_STATE_ROW_ID = 1;
 
 /* =========================================================
    DATOS / ESTADO
 ========================================================= */
-const uid = () => Math.random().toString(36).slice(2,9);
+const uid = () => {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) return crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c=>{
+    const r = Math.random()*16|0, v = c==='x' ? r : (r&0x3|0x8);
+    return v.toString(16);
+  });
+};
 const todayISO = () => new Date().toISOString().slice(0,10);
 const addDays = (n) => { const d=new Date(); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
 
@@ -598,44 +603,122 @@ function seedData(){
   };
 }
 
-async function loadState(){
-  const { data: row, error } = await sb.from('app_state').select('data').eq('id', APP_STATE_ROW_ID).maybeSingle();
-  if(error){
-    console.error('Error cargando datos de Supabase', error);
-    throw error;
-  }
+/* =========================================================
+   CAPA DE DATOS (Supabase: una tabla real por módulo)
+========================================================= */
+// Traduce entre los nombres de campo usados en el código (camelCase)
+// y las columnas reales de cada tabla en Postgres (snake_case).
+const TABLE_MAPS = {
+  clientes: { nombre:'nombre', sector:'sector', ciudad:'ciudad', producto:'producto', plan:'plan', email:'email', telefono:'telefono', estado:'estado', valorMensual:'valor_mensual', fechaRegistro:'fecha_registro', notas:'notas' },
+  ventas: { clienteId:'cliente_id', nombreLead:'nombre_lead', producto:'producto', plan:'plan', valor:'valor', etapa:'etapa', fecha:'fecha' },
+  facturas: { clienteId:'cliente_id', producto:'producto', concepto:'concepto', monto:'monto', fechaEmision:'fecha_emision', fechaVenc:'fecha_venc', estado:'estado' },
+  agenda: { clienteId:'cliente_id', tipo:'tipo', fecha:'fecha', hora:'hora', duracion:'duracion', modalidad:'modalidad', estado:'estado', notas:'notas' },
+  cotizaciones: { numero:'numero', fecha:'fecha', validezDias:'validez_dias', estado:'estado', clienteId:'cliente_id', clienteNombre:'cliente_nombre', clienteContacto:'cliente_contacto', clienteEmail:'cliente_email', consultorNombre:'consultor_nombre', consultorCargo:'consultor_cargo', consultorContacto:'consultor_contacto', tipoServicio:'tipo_servicio', titulo:'titulo', resumen:'resumen', fases:'fases', items:'items', ivaPct:'iva_pct', formaPago:'forma_pago', tiempoEjecucion:'tiempo_ejecucion', notasAdicionales:'notas_adicionales' },
+};
+const DATA_TABLES = ['clientes','ventas','facturas','agenda','cotizaciones'];
 
-  let data = row && row.data && Object.keys(row.data).length ? row.data : null;
-  let changed = false;
-  if(!data){
-    data = seedData();
-    changed = true;
+function toRow(table, obj){
+  const map = TABLE_MAPS[table];
+  const row = {};
+  if(obj.id) row.id = obj.id;
+  for(const key in map){ if(obj[key] !== undefined) row[map[key]] = obj[key]; }
+  return row;
+}
+function fromRow(table, row){
+  const map = TABLE_MAPS[table];
+  const obj = { id: row.id };
+  for(const key in map){ obj[key] = row[map[key]]; }
+  return obj;
+}
+async function dbFetchAll(table){
+  const { data, error } = await sb.from(table).select('*');
+  if(error) throw error;
+  return data.map(r=>fromRow(table, r));
+}
+async function dbInsert(table, obj){
+  const { data, error } = await sb.from(table).insert(toRow(table, obj)).select().single();
+  if(error){ console.error(error); toast('Error guardando en '+table); throw error; }
+  return fromRow(table, data);
+}
+async function dbUpdate(table, id, patch){
+  const { error } = await sb.from(table).update(toRow(table, patch)).eq('id', id);
+  if(error){ console.error(error); toast('Error actualizando '+table); throw error; }
+}
+async function dbDelete(table, id){
+  const { error } = await sb.from(table).delete().eq('id', id);
+  if(error){ console.error(error); toast('Error eliminando de '+table); throw error; }
+}
+
+async function loadConfigRow(){
+  const { data, error } = await sb.from('config').select('*').eq('id',1).maybeSingle();
+  if(error) throw error;
+  return data;
+}
+function configRowToObj(row){
+  return {
+    empresa: row.empresa, moneda:'COP',
+    consultorNombre: row.consultor_nombre, consultorCargo: row.consultor_cargo, consultorContacto: row.consultor_contacto,
+  };
+}
+async function updateConfigRow(patch){
+  const dbPatch = {};
+  if(patch.empresa !== undefined) dbPatch.empresa = patch.empresa;
+  if(patch.consultorNombre !== undefined) dbPatch.consultor_nombre = patch.consultorNombre;
+  if(patch.consultorCargo !== undefined) dbPatch.consultor_cargo = patch.consultorCargo;
+  if(patch.consultorContacto !== undefined) dbPatch.consultor_contacto = patch.consultorContacto;
+  if(patch.cotizacionSeq !== undefined) dbPatch.cotizacion_seq = patch.cotizacionSeq;
+  const { error } = await sb.from('config').update(dbPatch).eq('id',1);
+  if(error){ console.error(error); toast('Error actualizando configuración'); throw error; }
+}
+
+async function seedTablesIfEmpty(){
+  const seed = seedData();
+  await sb.from('clientes').insert(seed.clientes.map(c=>toRow('clientes', c)));
+  await sb.from('ventas').insert(seed.ventas.map(v=>toRow('ventas', v)));
+  await sb.from('facturas').insert(seed.facturas.map(f=>toRow('facturas', f)));
+  await sb.from('agenda').insert(seed.agenda.map(a=>toRow('agenda', a)));
+  await sb.from('cotizaciones').insert(seed.cotizaciones.map(c=>toRow('cotizaciones', c)));
+  await updateConfigRow({ empresa: seed.config.empresa, consultorNombre: seed.config.consultorNombre, consultorCargo: seed.config.consultorCargo, consultorContacto: seed.config.consultorContacto, cotizacionSeq: seed.cotizacionSeq });
+}
+
+async function resetAllTables(){
+  // Se borran primero las tablas que referencian a clientes, y clientes al final.
+  for(const t of ['ventas','facturas','agenda','cotizaciones','clientes']){
+    const { error } = await sb.from(t).delete().not('id','is',null);
+    if(error) throw error;
   }
-  if(!Array.isArray(data.cotizaciones)){ data.cotizaciones = []; changed = true; }
-  if(typeof data.cotizacionSeq !== 'number'){ data.cotizacionSeq = 1; changed = true; }
-  if(data.config && data.config.consultorNombre === undefined){
-    data.config.consultorNombre = 'Equipo Comercial';
-    data.config.consultorCargo = 'Consultor de Soluciones';
-    data.config.consultorContacto = 'contacto@taseca.tech | +57 300 000 0000';
-    changed = true;
-  }
-  if(changed){
-    await sb.from('app_state').upsert({ id: APP_STATE_ROW_ID, data, updated_at: new Date().toISOString() });
+  await seedTablesIfEmpty();
+}
+
+async function fetchAllFromTables(){
+  const [clientes, ventas, facturas, agenda, cotizaciones, configRow] = await Promise.all([
+    dbFetchAll('clientes'), dbFetchAll('ventas'), dbFetchAll('facturas'), dbFetchAll('agenda'), dbFetchAll('cotizaciones'), loadConfigRow(),
+  ]);
+  return {
+    clientes, ventas, facturas, agenda, cotizaciones,
+    productos: seedData().productos,
+    cotizacionSeq: configRow ? (configRow.cotizacion_seq || 1) : 1,
+    config: configRow ? configRowToObj(configRow) : { empresa:'Taseca Software', moneda:'COP', consultorNombre:'Equipo Comercial', consultorCargo:'Consultor de Soluciones', consultorContacto:'contacto@taseca.tech' },
+  };
+}
+
+async function loadState(){
+  let data = await fetchAllFromTables();
+  if(!data.clientes.length && !data.ventas.length && !data.facturas.length && !data.agenda.length && !data.cotizaciones.length){
+    await seedTablesIfEmpty();
+    data = await fetchAllFromTables();
   }
   return data;
 }
 
-let saveDebounceTimer = null;
-function saveState(){
-  clearTimeout(saveDebounceTimer);
-  saveDebounceTimer = setTimeout(async ()=>{
-    const { error } = await sb.from('app_state')
-      .upsert({ id: APP_STATE_ROW_ID, data: STATE, updated_at: new Date().toISOString() });
-    if(error){
-      console.error('Error guardando en Supabase', error);
-      toast('No se pudo guardar en la nube, revisa tu conexión');
-    }
-  }, 350);
+// Genera el siguiente número de cotización (TSC-AAAA-NNN) e incrementa el contador en la tabla config.
+async function nextCotizacionNumero(){
+  const cfg = await loadConfigRow();
+  const seq = (cfg && cfg.cotizacion_seq) || 1;
+  const numero = 'TSC-' + new Date().getFullYear() + '-' + String(seq).padStart(3,'0');
+  await updateConfigRow({ cotizacionSeq: seq + 1 });
+  STATE.cotizacionSeq = seq + 1;
+  return numero;
 }
 
 let STATE = null;
@@ -969,9 +1052,10 @@ function RENDER_CLIENTES(){
   document.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click', ()=>openClienteModal(b.dataset.edit)));
   document.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click', ()=>{
     const c = STATE.clientes.find(c=>c.id===b.dataset.del);
-    confirmDialog(`¿Eliminar al cliente <b>${escapeHtml(c.nombre)}</b>? Esta acción no se puede deshacer.`, ()=>{
+    confirmDialog(`¿Eliminar al cliente <b>${escapeHtml(c.nombre)}</b>? Esta acción no se puede deshacer.`, async ()=>{
+      await dbDelete('clientes', c.id);
       STATE.clientes = STATE.clientes.filter(x=>x.id!==c.id);
-      saveState(); RENDER_CLIENTES(); toast('Cliente eliminado');
+      RENDER_CLIENTES(); toast('Cliente eliminado');
     });
   }));
 }
@@ -1015,7 +1099,7 @@ function openClienteModal(id){
     <button class="btn btn-primary" id="saveBtn">${ICONS.check} Guardar</button>
   `);
   document.getElementById('cancelBtn').onclick = closeModal;
-  document.getElementById('saveBtn').onclick = ()=>{
+  document.getElementById('saveBtn').onclick = async ()=>{
     const nombre = document.getElementById('f_nombre').value.trim();
     if(!nombre){ toast('El nombre es obligatorio'); return; }
     const data = {
@@ -1031,11 +1115,13 @@ function openClienteModal(id){
       notas: document.getElementById('f_notas').value.trim(),
     };
     if(editing){
+      await dbUpdate('clientes', c.id, data);
       Object.assign(c, data);
     } else {
-      STATE.clientes.push({id:uid(), fechaRegistro:todayISO(), ...data});
+      const created = await dbInsert('clientes', {id:uid(), fechaRegistro:todayISO(), ...data});
+      STATE.clientes.push(created);
     }
-    saveState(); closeModal(); RENDER_CLIENTES(); toast(editing?'Cliente actualizado':'Cliente creado');
+    closeModal(); RENDER_CLIENTES(); toast(editing?'Cliente actualizado':'Cliente creado');
     if(CURRENT_VIEW==='dashboard') RENDER_DASHBOARD();
   };
 }
@@ -1110,12 +1196,13 @@ function openVentaModal(id){
   `);
   document.getElementById('cancelBtn').onclick = closeModal;
   if(editing){
-    document.getElementById('delBtn').onclick = ()=>{
+    document.getElementById('delBtn').onclick = async ()=>{
+      await dbDelete('ventas', v.id);
       STATE.ventas = STATE.ventas.filter(x=>x.id!==v.id);
-      saveState(); closeModal(); RENDER_VENTAS(); toast('Oportunidad eliminada');
+      closeModal(); RENDER_VENTAS(); toast('Oportunidad eliminada');
     };
   }
-  document.getElementById('saveBtn').onclick = ()=>{
+  document.getElementById('saveBtn').onclick = async ()=>{
     const data = {
       clienteId: document.getElementById('f_cliente').value || null,
       nombreLead: document.getElementById('f_lead').value.trim(),
@@ -1126,8 +1213,9 @@ function openVentaModal(id){
       fecha: document.getElementById('f_fecha').value || todayISO(),
     };
     if(!data.clienteId && !data.nombreLead){ toast('Selecciona un cliente o escribe el nombre del lead'); return; }
-    if(editing){ Object.assign(v, data); } else { STATE.ventas.push({id:uid(), ...data}); }
-    saveState(); closeModal(); RENDER_VENTAS(); toast(editing?'Oportunidad actualizada':'Oportunidad creada');
+    if(editing){ await dbUpdate('ventas', v.id, data); Object.assign(v, data); }
+    else { const created = await dbInsert('ventas', {id:uid(), ...data}); STATE.ventas.push(created); }
+    closeModal(); RENDER_VENTAS(); toast(editing?'Oportunidad actualizada':'Oportunidad creada');
     if(CURRENT_VIEW==='dashboard') RENDER_DASHBOARD();
   };
 }
@@ -1282,26 +1370,28 @@ function renderCotizacionList(){
   document.getElementById('fEstadoCotizacion').value = cotizacionListFiltro.estado;
   document.getElementById('fEstadoCotizacion').addEventListener('change', e=>{cotizacionListFiltro.estado=e.target.value; renderCotizacionList();});
   document.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click', ()=>openCotizacionEditor(b.dataset.open)));
-  document.querySelectorAll('[data-estado]').forEach(sel=>sel.addEventListener('change', e=>{
+  document.querySelectorAll('[data-estado]').forEach(sel=>sel.addEventListener('change', async e=>{
     const c = STATE.cotizaciones.find(c=>c.id===sel.dataset.estado);
-    c.estado = e.target.value; saveState(); renderCotizacionList(); toast('Estado actualizado');
+    await dbUpdate('cotizaciones', c.id, {estado: e.target.value});
+    c.estado = e.target.value; renderCotizacionList(); toast('Estado actualizado');
   }));
-  document.querySelectorAll('[data-dup]').forEach(b=>b.addEventListener('click', ()=>{
+  document.querySelectorAll('[data-dup]').forEach(b=>b.addEventListener('click', async ()=>{
     const orig = STATE.cotizaciones.find(c=>c.id===b.dataset.dup);
     const copy = JSON.parse(JSON.stringify(orig));
-    copy.id = uid();
-    copy.numero = 'TSC-'+new Date().getFullYear()+'-'+String(STATE.cotizacionSeq).padStart(3,'0');
-    STATE.cotizacionSeq++;
+    delete copy.id;
+    copy.numero = await nextCotizacionNumero();
     copy.fecha = todayISO();
     copy.estado = 'Borrador';
-    STATE.cotizaciones.push(copy);
-    saveState(); renderCotizacionList(); toast('Cotización duplicada');
+    const created = await dbInsert('cotizaciones', {id:uid(), ...copy});
+    STATE.cotizaciones.push(created);
+    renderCotizacionList(); toast('Cotización duplicada');
   }));
   document.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click', ()=>{
     const c = STATE.cotizaciones.find(c=>c.id===b.dataset.del);
-    confirmDialog(`¿Eliminar la cotización <b>${escapeHtml(c.numero||'')}</b> de <b>${escapeHtml(c.clienteNombre||'')}</b>?`, ()=>{
+    confirmDialog(`¿Eliminar la cotización <b>${escapeHtml(c.numero||'')}</b> de <b>${escapeHtml(c.clienteNombre||'')}</b>?`, async ()=>{
+      await dbDelete('cotizaciones', c.id);
       STATE.cotizaciones = STATE.cotizaciones.filter(x=>x.id!==c.id);
-      saveState(); renderCotizacionList(); toast('Cotización eliminada');
+      renderCotizacionList(); toast('Cotización eliminada');
     });
   }));
 }
@@ -1639,21 +1729,21 @@ function renderQPPreview(){
   `;
 }
 
-function saveCotizacion(){
+async function saveCotizacion(){
   const cot = editingCotizacion;
   if(!cot.clienteNombre.trim()){ toast('Escribe el nombre del cliente antes de guardar'); return; }
   if(!cot.titulo.trim()){ toast('Escribe el título del proyecto antes de guardar'); return; }
   const isNew = !cot.id;
   if(isNew){
-    cot.id = uid();
-    cot.numero = 'TSC-'+new Date().getFullYear()+'-'+String(STATE.cotizacionSeq).padStart(3,'0');
-    STATE.cotizacionSeq++;
+    cot.numero = await nextCotizacionNumero();
+    const created = await dbInsert('cotizaciones', {id:uid(), ...cot});
+    Object.assign(cot, created);
     STATE.cotizaciones.push(cot);
   } else {
+    await dbUpdate('cotizaciones', cot.id, cot);
     const idx = STATE.cotizaciones.findIndex(c=>c.id===cot.id);
     STATE.cotizaciones[idx] = cot;
   }
-  saveState();
   toast(isNew ? 'Cotización creada' : 'Cotización actualizada');
   renderCotizacionEditor();
   if(CURRENT_VIEW==='dashboard') RENDER_DASHBOARD();
@@ -1750,9 +1840,10 @@ function RENDER_FACTURAS(){
   document.getElementById('fEstadoFactura').addEventListener('change', e=>{facturaFiltro.estado=e.target.value; RENDER_FACTURAS();});
   document.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click', ()=>openFacturaModal(b.dataset.edit)));
   document.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click', ()=>{
-    confirmDialog('¿Eliminar esta factura?', ()=>{
+    confirmDialog('¿Eliminar esta factura?', async ()=>{
+      await dbDelete('facturas', b.dataset.del);
       STATE.facturas = STATE.facturas.filter(x=>x.id!==b.dataset.del);
-      saveState(); RENDER_FACTURAS(); toast('Factura eliminada');
+      RENDER_FACTURAS(); toast('Factura eliminada');
     });
   }));
 }
@@ -1790,7 +1881,7 @@ function openFacturaModal(id){
     <button class="btn btn-primary" id="saveBtn">${ICONS.check} Guardar</button>
   `);
   document.getElementById('cancelBtn').onclick = closeModal;
-  document.getElementById('saveBtn').onclick = ()=>{
+  document.getElementById('saveBtn').onclick = async ()=>{
     const clienteId = document.getElementById('f_cliente').value;
     if(!clienteId){ toast('Selecciona un cliente'); return; }
     const data = {
@@ -1802,8 +1893,9 @@ function openFacturaModal(id){
       fechaVenc: document.getElementById('f_venc').value || todayISO(),
       estado: document.getElementById('f_estado').value,
     };
-    if(editing){ Object.assign(f, data); } else { STATE.facturas.push({id:uid(), ...data}); }
-    saveState(); closeModal(); RENDER_FACTURAS(); toast(editing?'Factura actualizada':'Factura creada');
+    if(editing){ await dbUpdate('facturas', f.id, data); Object.assign(f, data); }
+    else { const created = await dbInsert('facturas', {id:uid(), ...data}); STATE.facturas.push(created); }
+    closeModal(); RENDER_FACTURAS(); toast(editing?'Factura actualizada':'Factura creada');
     if(CURRENT_VIEW==='dashboard') RENDER_DASHBOARD();
   };
 }
@@ -1845,9 +1937,10 @@ function RENDER_AGENDA(){
   `;
   document.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click', ()=>openAgendaModal(b.dataset.edit)));
   document.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click', ()=>{
-    confirmDialog('¿Eliminar este evento de la agenda?', ()=>{
+    confirmDialog('¿Eliminar este evento de la agenda?', async ()=>{
+      await dbDelete('agenda', b.dataset.del);
       STATE.agenda = STATE.agenda.filter(x=>x.id!==b.dataset.del);
-      saveState(); RENDER_AGENDA(); toast('Evento eliminado');
+      RENDER_AGENDA(); toast('Evento eliminado');
     });
   }));
 }
@@ -1891,7 +1984,7 @@ function openAgendaModal(id){
     <button class="btn btn-primary" id="saveBtn">${ICONS.check} Guardar</button>
   `);
   document.getElementById('cancelBtn').onclick = closeModal;
-  document.getElementById('saveBtn').onclick = ()=>{
+  document.getElementById('saveBtn').onclick = async ()=>{
     const clienteId = document.getElementById('f_cliente').value;
     if(!clienteId){ toast('Selecciona un cliente'); return; }
     const data = {
@@ -1904,8 +1997,9 @@ function openAgendaModal(id){
       estado: document.getElementById('f_estado').value,
       notas: document.getElementById('f_notas').value.trim(),
     };
-    if(editing){ Object.assign(a, data); } else { STATE.agenda.push({id:uid(), ...data}); }
-    saveState(); closeModal(); RENDER_AGENDA(); toast(editing?'Evento actualizado':'Evento creado');
+    if(editing){ await dbUpdate('agenda', a.id, data); Object.assign(a, data); }
+    else { const created = await dbInsert('agenda', {id:uid(), ...data}); STATE.agenda.push(created); }
+    closeModal(); RENDER_AGENDA(); toast(editing?'Evento actualizado':'Evento creado');
     if(CURRENT_VIEW==='dashboard') RENDER_DASHBOARD();
   };
 }
@@ -2040,10 +2134,12 @@ function RENDER_CONFIG(){
       </p>
     </div>
   `;
-  document.getElementById('saveConfig').onclick = ()=>{
-    STATE.config.empresa = document.getElementById('f_empresa').value.trim() || 'Taseca Software';
+  document.getElementById('saveConfig').onclick = async ()=>{
+    const empresa = document.getElementById('f_empresa').value.trim() || 'Taseca Software';
+    await updateConfigRow({ empresa });
+    STATE.config.empresa = empresa;
     document.getElementById('companyNameLabel').textContent = STATE.config.empresa;
-    saveState(); toast('Configuración guardada');
+    toast('Configuración guardada');
   };
   document.getElementById('exportBtn').onclick = ()=>{
     const blob = new Blob([JSON.stringify(STATE, null, 2)], {type:'application/json'});
@@ -2053,9 +2149,9 @@ function RENDER_CONFIG(){
     URL.revokeObjectURL(url);
   };
   document.getElementById('resetBtn').onclick = ()=>{
-    confirmDialog('Esto reemplazará TODOS los datos actuales (de toda la empresa, no solo tu navegador) por los datos de ejemplo iniciales. ¿Continuar?', ()=>{
-      STATE = seedData();
-      saveState();
+    confirmDialog('Esto reemplazará TODOS los datos actuales (de toda la empresa, no solo tu navegador) por los datos de ejemplo iniciales. ¿Continuar?', async ()=>{
+      await resetAllTables();
+      STATE = await loadState();
       document.getElementById('companyNameLabel').textContent = STATE.config.empresa;
       goTo('dashboard');
       toast('Datos restablecidos');
