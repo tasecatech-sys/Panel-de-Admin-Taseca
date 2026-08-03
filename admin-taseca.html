@@ -1,0 +1,2019 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Taseca | Panel de Administración</title>
+<style>
+:root{
+  --bg:#f4f6fb;
+  --panel:#ffffff;
+  --panel-2:#f8f9fc;
+  --border:#e4e8f1;
+  --text:#1c2333;
+  --text-dim:#697086;
+  --sidebar:#12172b;
+  --sidebar-2:#1b2140;
+  --accent:#5b5ff2;
+  --accent-2:#17c3b2;
+  --accent-3:#ff9f5b;
+  --danger:#e0525f;
+  --warn:#e2a63a;
+  --ok:#26b26a;
+  --radius:14px;
+  --shadow:0 4px 18px rgba(20,25,50,.06);
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  font-family:'Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif;
+  background:var(--bg);
+  color:var(--text);
+  display:flex;
+  min-height:100vh;
+  overflow-x:hidden;
+}
+a{color:inherit;}
+button{font-family:inherit;}
+
+/* ---------- layout ---------- */
+#sidebar{
+  width:230px;
+  min-width:230px;
+  background:linear-gradient(180deg,var(--sidebar),var(--sidebar-2));
+  color:#e8eaf6;
+  display:flex;
+  flex-direction:column;
+  position:sticky;
+  top:0;
+  height:100vh;
+  z-index:20;
+}
+.brand{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:22px 20px 18px 20px;
+  border-bottom:1px solid rgba(255,255,255,.08);
+}
+.brand-mark{
+  width:36px;height:36px;border-radius:10px;
+  background:linear-gradient(135deg,var(--accent),var(--accent-2));
+  display:flex;align-items:center;justify-content:center;
+  font-weight:800;font-size:16px;color:#fff;flex-shrink:0;
+}
+.brand-name{font-weight:700;font-size:15px;letter-spacing:.3px;}
+.brand-sub{font-size:11px;color:#9aa1c4;margin-top:1px;}
+
+nav.navlinks{padding:14px 10px;display:flex;flex-direction:column;gap:2px;flex:1;overflow-y:auto;}
+.navitem{
+  display:flex;align-items:center;gap:11px;
+  padding:10px 12px;border-radius:10px;
+  color:#c3c8e6;text-decoration:none;font-size:13.5px;
+  cursor:pointer;border:none;background:none;text-align:left;width:100%;
+  transition:background .15s,color .15s;
+}
+.navitem svg{width:17px;height:17px;flex-shrink:0;opacity:.85;}
+.navitem:hover{background:rgba(255,255,255,.06);color:#fff;}
+.navitem.active{background:linear-gradient(90deg,rgba(91,95,242,.35),rgba(23,195,178,.12));color:#fff;}
+.navitem.active svg{opacity:1;}
+.nav-section-label{font-size:10.5px;text-transform:uppercase;letter-spacing:.08em;color:#6b7196;padding:14px 12px 4px;}
+
+.sidebar-foot{padding:14px 16px;border-top:1px solid rgba(255,255,255,.08);font-size:11px;color:#7d84ac;}
+
+#main{flex:1;min-width:0;display:flex;flex-direction:column;}
+#topbar{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:16px 26px;background:var(--panel);border-bottom:1px solid var(--border);
+  position:sticky;top:0;z-index:10;
+}
+#topbar h1{font-size:19px;margin:0;font-weight:700;}
+#topbar .sub{font-size:12.5px;color:var(--text-dim);margin-top:2px;}
+.top-actions{display:flex;gap:10px;align-items:center;}
+.search-box{
+  display:flex;align-items:center;gap:6px;
+  background:var(--panel-2);border:1px solid var(--border);border-radius:9px;
+  padding:7px 12px;font-size:13px;color:var(--text-dim);min-width:210px;
+}
+.search-box input{border:none;background:none;outline:none;font-size:13px;width:100%;color:var(--text);}
+.search-box svg{width:15px;height:15px;opacity:.6;flex-shrink:0;}
+
+#view{padding:24px 26px 60px;flex:1;}
+
+/* ---------- buttons ---------- */
+.btn{
+  display:inline-flex;align-items:center;gap:7px;
+  padding:9px 16px;border-radius:9px;border:1px solid transparent;
+  font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;
+  transition:filter .15s, transform .05s;
+}
+.btn:active{transform:translateY(1px);}
+.btn-primary{background:linear-gradient(135deg,var(--accent),#7b7ffb);color:#fff;}
+.btn-primary:hover{filter:brightness(1.07);}
+.btn-outline{background:var(--panel);border-color:var(--border);color:var(--text);}
+.btn-outline:hover{background:var(--panel-2);}
+.btn-danger{background:#fdecee;color:var(--danger);}
+.btn-danger:hover{background:#fbdadd;}
+.btn-ghost{background:none;color:var(--text-dim);padding:6px 8px;}
+.btn-ghost:hover{color:var(--text);}
+.btn-sm{padding:6px 10px;font-size:12px;}
+
+/* ---------- cards / grid ---------- */
+.grid{display:grid;gap:18px;}
+.grid-4{grid-template-columns:repeat(4,1fr);}
+.grid-2{grid-template-columns:2fr 1fr;}
+.grid-3{grid-template-columns:repeat(3,1fr);}
+@media(max-width:1100px){.grid-4{grid-template-columns:repeat(2,1fr);} .grid-2{grid-template-columns:1fr;} .grid-3{grid-template-columns:1fr;}}
+
+.card{
+  background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);
+  box-shadow:var(--shadow);padding:18px 20px;
+}
+.card-title{font-size:14px;font-weight:700;margin:0 0 14px;display:flex;align-items:center;justify-content:space-between;}
+.card-title small{font-weight:500;color:var(--text-dim);font-size:11.5px;}
+
+.kpi{padding:18px 20px;}
+.kpi .label{font-size:12px;color:var(--text-dim);font-weight:600;display:flex;align-items:center;gap:8px;}
+.kpi .icon{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.kpi .icon svg{width:16px;height:16px;color:#fff;}
+.kpi .value{font-size:25px;font-weight:800;margin-top:10px;}
+.kpi .delta{font-size:11.5px;margin-top:5px;color:var(--text-dim);}
+.kpi .delta.up{color:var(--ok);}
+.kpi .delta.down{color:var(--danger);}
+
+/* ---------- table ---------- */
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{
+  text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;
+  color:var(--text-dim);padding:9px 12px;border-bottom:1px solid var(--border);font-weight:700;
+}
+td{padding:11px 12px;border-bottom:1px solid var(--border);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+tbody tr:hover{background:var(--panel-2);}
+.table-wrap{overflow-x:auto;}
+.cell-strong{font-weight:600;}
+.cell-dim{color:var(--text-dim);font-size:12px;}
+
+.badge{
+  display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:100px;
+  font-size:11px;font-weight:700;white-space:nowrap;
+}
+.badge-dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
+.badge-blue{background:#eaeaff;color:#5b5ff2;}
+.badge-green{background:#e4f8ee;color:#1f9f5c;}
+.badge-orange{background:#fff2e2;color:#c97a15;}
+.badge-red{background:#fdecee;color:#d33e4c;}
+.badge-gray{background:#eef0f5;color:#697086;}
+.badge-teal{background:#e2f9f5;color:#0e9184;}
+.badge-purple{background:#f1e9ff;color:#8347e6;}
+
+.tag-product{font-size:11px;font-weight:700;padding:3px 9px;border-radius:7px;}
+.tag-agenda{background:#eaeaff;color:#5b5ff2;}
+.tag-excel{background:#e2f9f5;color:#0e9184;}
+.tag-ambos{background:linear-gradient(90deg,#eaeaff,#e2f9f5);color:#4a3fbf;}
+
+.row-actions{display:flex;gap:6px;justify-content:flex-end;}
+.icon-btn{
+  width:28px;height:28px;border-radius:7px;border:1px solid var(--border);background:var(--panel);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text-dim);
+}
+.icon-btn:hover{background:var(--panel-2);color:var(--text);}
+.icon-btn svg{width:14px;height:14px;}
+.icon-btn.danger:hover{background:#fdecee;color:var(--danger);border-color:#f6c9ce;}
+
+.toolbar{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:16px;flex-wrap:wrap;}
+.toolbar-left{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+select.filter, input.filter{
+  padding:8px 11px;border-radius:9px;border:1px solid var(--border);background:var(--panel);
+  font-size:12.5px;color:var(--text);outline:none;
+}
+.empty-state{padding:40px 20px;text-align:center;color:var(--text-dim);font-size:13px;}
+.empty-state svg{width:40px;height:40px;opacity:.35;margin-bottom:10px;}
+
+/* ---------- pipeline / kanban ---------- */
+.kanban{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;align-items:start;}
+@media(max-width:1300px){.kanban{grid-template-columns:repeat(3,1fr);}}
+.kanban-col{background:var(--panel-2);border:1px solid var(--border);border-radius:12px;padding:12px;min-height:120px;}
+.kanban-col-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:12.5px;font-weight:700;}
+.kanban-count{background:#fff;border:1px solid var(--border);border-radius:100px;padding:1px 8px;font-size:11px;color:var(--text-dim);}
+.deal-card{background:#fff;border:1px solid var(--border);border-radius:10px;padding:11px 12px;margin-bottom:9px;box-shadow:0 2px 6px rgba(20,25,50,.04);cursor:pointer;}
+.deal-card:hover{border-color:#c9cdf5;}
+.deal-card .name{font-weight:700;font-size:13px;margin-bottom:3px;}
+.deal-card .meta{font-size:11px;color:var(--text-dim);margin-bottom:6px;}
+.deal-card .val{font-weight:800;font-size:13px;color:var(--accent);}
+
+/* ---------- modal ---------- */
+.overlay{
+  position:fixed;inset:0;background:rgba(15,18,35,.5);backdrop-filter:blur(2px);
+  display:none;align-items:center;justify-content:center;z-index:100;padding:20px;
+}
+.overlay.show{display:flex;}
+.modal{
+  background:#fff;border-radius:16px;width:100%;max-width:520px;max-height:88vh;overflow-y:auto;
+  box-shadow:0 20px 60px rgba(0,0,0,.25);
+}
+.modal-head{padding:18px 22px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+.modal-head h3{margin:0;font-size:16px;}
+.modal-body{padding:20px 22px;}
+.modal-foot{padding:16px 22px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:10px;}
+.close-x{width:30px;height:30px;border-radius:8px;border:none;background:var(--panel-2);cursor:pointer;display:flex;align-items:center;justify-content:center;color:var(--text-dim);}
+.close-x:hover{background:var(--border);}
+
+.form-group{margin-bottom:14px;}
+.form-group label{display:block;font-size:12px;font-weight:700;color:var(--text-dim);margin-bottom:5px;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.form-group input,.form-group select,.form-group textarea{
+  width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:9px;
+  font-size:13px;font-family:inherit;outline:none;background:#fff;color:var(--text);
+}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--accent);}
+.form-group textarea{resize:vertical;min-height:64px;}
+.form-hint{font-size:11px;color:var(--text-dim);margin-top:4px;}
+
+/* ---------- charts (css only) ---------- */
+.donut-wrap{display:flex;align-items:center;gap:20px;}
+.donut{width:130px;height:130px;border-radius:50%;flex-shrink:0;}
+.donut-legend{display:flex;flex-direction:column;gap:9px;font-size:12.5px;}
+.legend-item{display:flex;align-items:center;gap:8px;}
+.legend-dot{width:9px;height:9px;border-radius:3px;flex-shrink:0;}
+.legend-val{margin-left:auto;font-weight:700;color:var(--text-dim);padding-left:14px;}
+
+.bars{display:flex;flex-direction:column;gap:12px;}
+.bar-row{display:grid;grid-template-columns:70px 1fr 90px;align-items:center;gap:10px;font-size:12px;}
+.bar-track{background:var(--panel-2);border-radius:100px;height:10px;overflow:hidden;}
+.bar-fill{height:100%;border-radius:100px;background:linear-gradient(90deg,var(--accent),var(--accent-2));}
+.bar-val{text-align:right;font-weight:700;color:var(--text-dim);}
+
+/* ---------- product cards ---------- */
+.product-hero{
+  border-radius:16px;padding:22px 24px;color:#fff;position:relative;overflow:hidden;
+}
+.product-hero.p1{background:linear-gradient(135deg,#5b5ff2,#7b3ff0);}
+.product-hero.p2{background:linear-gradient(135deg,#0e9184,#17c3b2);}
+.product-hero h2{margin:0 0 6px;font-size:19px;}
+.product-hero p{margin:0;font-size:13px;opacity:.92;max-width:560px;line-height:1.5;}
+.plan-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:16px;}
+@media(max-width:900px){.plan-grid{grid-template-columns:1fr;}}
+.plan-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;position:relative;}
+.plan-card h4{margin:0 0 4px;font-size:14px;}
+.plan-card .price{font-size:21px;font-weight:800;margin:8px 0 10px;}
+.plan-card .price span{font-size:11px;font-weight:600;color:var(--text-dim);}
+.plan-card ul{margin:0;padding-left:18px;font-size:12px;color:var(--text-dim);line-height:1.9;}
+.plan-card .stat{position:absolute;top:14px;right:14px;font-size:11px;font-weight:700;color:var(--text-dim);}
+
+.segmentos{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;}
+.segmento-chip{background:var(--panel-2);border:1px solid var(--border);padding:6px 12px;border-radius:100px;font-size:12px;font-weight:600;color:var(--text-dim);}
+
+.upcoming-item{display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--border);}
+.upcoming-item:last-child{border-bottom:none;}
+.upcoming-date{width:46px;flex-shrink:0;text-align:center;background:var(--panel-2);border-radius:9px;padding:6px 0;}
+.upcoming-date .d{font-size:16px;font-weight:800;line-height:1;}
+.upcoming-date .m{font-size:9.5px;text-transform:uppercase;color:var(--text-dim);font-weight:700;}
+.upcoming-info .t{font-size:13px;font-weight:700;}
+.upcoming-info .s{font-size:11.5px;color:var(--text-dim);margin-top:2px;}
+
+.toast{
+  position:fixed;bottom:22px;right:22px;background:#1c2333;color:#fff;padding:12px 18px;
+  border-radius:10px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:200;
+  display:flex;align-items:center;gap:8px;opacity:0;transform:translateY(10px);transition:all .25s;pointer-events:none;
+}
+.toast.show{opacity:1;transform:translateY(0);}
+
+.pill-tabs{display:flex;gap:6px;background:var(--panel-2);border:1px solid var(--border);padding:4px;border-radius:10px;width:fit-content;}
+.pill-tab{padding:7px 14px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;color:var(--text-dim);border:none;background:none;}
+.pill-tab.active{background:#fff;color:var(--text);box-shadow:0 1px 4px rgba(0,0,0,.08);}
+
+.confirm-box{padding:6px 2px 2px;font-size:13.5px;color:var(--text-dim);}
+.confirm-box b{color:var(--text);}
+
+/* ---------- cotizaciones: lista ---------- */
+.quote-total-chip{font-weight:800;font-size:13px;}
+.estado-select{border:none;background:none;font-size:11px;font-weight:700;cursor:pointer;padding:3px 8px;border-radius:100px;-webkit-appearance:none;appearance:none;}
+
+/* ---------- cotizaciones: editor ---------- */
+.qe-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start;}
+@media(max-width:1200px){.qe-layout{grid-template-columns:1fr;}}
+.qe-form{display:flex;flex-direction:column;gap:16px;}
+.qe-sticky{position:sticky;top:86px;}
+.qe-section-title{font-size:12.5px;font-weight:800;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em;margin:0 0 12px;display:flex;align-items:center;gap:8px;}
+.qe-section-title .num{width:20px;height:20px;border-radius:6px;background:var(--accent);color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:11px;}
+.qe-line{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:start;border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px;background:var(--panel-2);}
+.qe-line-fields{display:flex;flex-direction:column;gap:8px;}
+.qe-item-grid{display:grid;grid-template-columns:1fr 70px 130px 130px;gap:8px;align-items:center;border:1px solid var(--border);border-radius:10px;padding:10px;margin-bottom:8px;background:var(--panel-2);}
+@media(max-width:640px){.qe-item-grid{grid-template-columns:1fr;}}
+.qe-item-total{font-size:12px;font-weight:700;color:var(--text-dim);text-align:right;}
+.qe-add-row{display:flex;justify-content:flex-start;margin-top:4px;}
+.qe-remove{width:26px;height:26px;border-radius:7px;border:1px solid var(--border);background:#fff;color:var(--text-dim);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;}
+.qe-remove:hover{background:#fdecee;color:var(--danger);border-color:#f6c9ce;}
+.qe-preset-row{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap;}
+.qe-preset-row .form-group{flex:1;min-width:180px;margin-bottom:0;}
+.qe-toolbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px;}
+.qe-toolbar-actions{display:flex;gap:8px;flex-wrap:wrap;}
+
+/* ---------- cotizaciones: preview (marca TASECA) ---------- */
+.qp-outer{background:#050508;border-radius:16px;padding:20px;background-image:radial-gradient(circle at 15% 50%, rgba(0,255,255,.05) 0%, transparent 50%),radial-gradient(circle at 85% 30%, rgba(255,215,0,.05) 0%, transparent 50%);}
+.qp-card{background:#13131c;border:1px solid rgba(0,255,255,.2);border-radius:12px;padding:26px 24px;position:relative;overflow:hidden;box-shadow:0 0 25px rgba(0,255,255,.08);color:#e2e8f0;font-family:'Inter',system-ui,sans-serif;}
+.qp-card::before{content:'';position:absolute;top:0;left:0;width:100%;height:3px;background:linear-gradient(90deg,#FFD700,#00FFFF,#FFD700);opacity:.6;}
+.qp-tech{font-family:'Space Grotesk',system-ui,sans-serif;}
+.qp-head{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;flex-wrap:wrap;margin-bottom:26px;padding-bottom:18px;border-bottom:1px solid rgba(148,163,184,.15);}
+.qp-brand{display:flex;align-items:center;gap:12px;}
+.qp-logo{width:52px;height:52px;flex-shrink:0;}
+.qp-brand-name{font-size:24px;font-weight:700;letter-spacing:.12em;background:linear-gradient(90deg,#FFD700,#00FFFF);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin:0;}
+.qp-brand-sub{font-size:9px;letter-spacing:.18em;color:#8e8e9e;text-transform:uppercase;margin-top:2px;}
+.qp-meta{text-align:right;font-size:11.5px;color:#8e8e9e;}
+.qp-meta h2{font-size:15px;color:#00FFFF;margin:0 0 6px;font-weight:700;}
+.qp-meta .v{color:#e2e8f0;font-family:monospace;}
+.qp-cols{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:22px;}
+@media(max-width:560px){.qp-cols{grid-template-columns:1fr;}}
+.qp-box{background:rgba(0,0,0,.25);padding:12px 14px;border-left:2px solid #00FFFF;}
+.qp-box.gold{border-left-color:#FFD700;}
+.qp-box h3{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:#00FFFF;font-weight:700;margin:0 0 6px;}
+.qp-box.gold h3{color:#FFD700;}
+.qp-box h4{font-size:14px;color:#fff;margin:0 0 3px;font-weight:600;}
+.qp-box p{font-size:11.5px;color:#8e8e9e;margin:2px 0 0;}
+.qp-section{margin-bottom:22px;}
+.qp-section h3{font-size:14.5px;color:#00FFFF;border-bottom:1px solid rgba(148,163,184,.15);padding-bottom:8px;margin:0 0 12px;font-weight:700;}
+.qp-section p.desc{font-size:12.5px;color:#cbd5e1;line-height:1.6;}
+.qp-fase{display:flex;gap:10px;margin-bottom:14px;}
+.qp-fase-arrow{color:#FFD700;flex-shrink:0;margin-top:2px;}
+.qp-fase h4{font-size:12.5px;color:#fff;margin:0 0 3px;font-weight:600;}
+.qp-fase p{font-size:11.5px;color:#8e8e9e;margin:0;line-height:1.5;}
+.qp-table{width:100%;border-collapse:collapse;font-size:11.5px;}
+.qp-table thead tr{background:rgba(0,255,255,.08);border-top:1px solid rgba(0,255,255,.25);border-bottom:1px solid rgba(0,255,255,.25);}
+.qp-table th{padding:8px 10px;text-align:left;color:#00FFFF;text-transform:uppercase;letter-spacing:.03em;font-size:9.5px;font-weight:700;}
+.qp-table td{padding:8px 10px;border-bottom:1px solid rgba(148,163,184,.12);color:#cbd5e1;}
+.qp-table th:nth-child(2),.qp-table td:nth-child(2){text-align:center;}
+.qp-table th:nth-child(3),.qp-table td:nth-child(3),.qp-table th:nth-child(4),.qp-table td:nth-child(4){text-align:right;font-family:monospace;}
+.qp-totals{display:flex;justify-content:flex-end;margin-top:12px;}
+.qp-totals-box{width:100%;max-width:260px;font-size:11.5px;}
+.qp-totals-row{display:flex;justify-content:space-between;padding:3px 10px;color:#8e8e9e;}
+.qp-totals-row span:last-child{font-family:monospace;}
+.qp-totals-final{display:flex;justify-content:space-between;align-items:center;background:rgba(0,255,255,.08);border:1px solid rgba(0,255,255,.25);padding:10px 12px;border-radius:6px;margin-top:6px;}
+.qp-totals-final span:first-child{color:#00FFFF;font-weight:700;text-transform:uppercase;font-size:11px;}
+.qp-totals-final span:last-child{color:#fff;font-weight:800;font-size:15px;font-family:monospace;}
+.qp-cond{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:26px;font-size:11.5px;color:#8e8e9e;}
+@media(max-width:560px){.qp-cond{grid-template-columns:1fr;}}
+.qp-cond h4{color:#fff;font-size:12.5px;margin:0 0 8px;font-weight:700;}
+.qp-cond ul{margin:0;padding-left:16px;line-height:1.8;}
+.qp-sign{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;text-align:center;}
+.qp-sign .line{width:160px;border-bottom:1px solid #64748b;margin-bottom:8px;}
+.qp-sign .name{color:#fff;font-weight:600;font-size:12px;}
+.qp-foot{margin-top:28px;text-align:center;font-size:10px;color:#64748b;border-top:1px solid rgba(148,163,184,.15);padding-top:14px;}
+
+@media print{
+  body *{visibility:hidden;}
+  .qp-print-area, .qp-print-area *{visibility:visible;}
+  .qp-print-area{position:absolute;top:0;left:0;width:100%;margin:0;padding:0;}
+  .qp-outer{border-radius:0;padding:0;background:#050508;}
+}
+</style>
+</head>
+<body>
+
+<aside id="sidebar">
+  <div class="brand">
+    <div class="brand-mark">T</div>
+    <div>
+      <div class="brand-name" id="companyNameLabel">Taseca Software</div>
+      <div class="brand-sub">Panel de administración</div>
+    </div>
+  </div>
+  <nav class="navlinks" id="navlinks"></nav>
+  <div class="sidebar-foot">v1.0 · Datos guardados en este navegador</div>
+</aside>
+
+<div id="main">
+  <div id="topbar">
+    <div>
+      <h1 id="viewTitle">Dashboard</h1>
+      <div class="sub" id="viewSub">Resumen general del negocio</div>
+    </div>
+    <div class="top-actions">
+      <div class="search-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+        <input type="text" id="globalSearch" placeholder="Buscar clientes...">
+      </div>
+      <button class="btn btn-primary" id="quickAddBtn"></button>
+    </div>
+  </div>
+  <div id="view"></div>
+</div>
+
+<div class="overlay" id="overlay">
+  <div class="modal" id="modal"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* =========================================================
+   ICONOS SVG
+========================================================= */
+const ICONS = {
+  dashboard:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>',
+  clientes:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+  ventas:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7h-9"/><path d="M14 17H5"/><circle cx="17" cy="17" r="3"/><circle cx="7" cy="7" r="3"/></svg>',
+  productos:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m7.5 4.27 9 5.15"/><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/><path d="m3.3 7 8.7 5 8.7-5"/><path d="M12 22V12"/></svg>',
+  facturas:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>',
+  agenda:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>',
+  reportes:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>',
+  config:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg>',
+  plus:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg>',
+  edit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+  trash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>',
+  users:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+  cash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 10v.01"/><path d="M18 14v.01"/></svg>',
+  target:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>',
+  alert:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>',
+  empty:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16Z"/></svg>',
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>',
+  cotizaciones:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="m9 15 2 2 4-4"/></svg>',
+  arrowLeft:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>',
+  copy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
+  printer:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>',
+};
+
+/* =========================================================
+   DATOS / ESTADO
+========================================================= */
+const STORAGE_KEY = 'taseca_admin_data_v1';
+const uid = () => Math.random().toString(36).slice(2,9);
+const todayISO = () => new Date().toISOString().slice(0,10);
+const addDays = (n) => { const d=new Date(); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
+
+function seedData(){
+  const clientes = [
+    {id:uid(), nombre:'Barbería El Corte Fino', sector:'Barbería', producto:'agendamiento', plan:'Profesional', email:'contacto@elcortefino.com', telefono:'3001234567', ciudad:'Bogotá', estado:'Activo', valorMensual:180000, fechaRegistro:addDays(-95), notas:'Cliente desde apertura de segunda sede.'},
+    {id:uid(), nombre:'Salón Bella Diva', sector:'Salón de belleza', producto:'agendamiento', plan:'Básico', email:'info@belladiva.co', telefono:'3012345678', ciudad:'Medellín', estado:'Activo', valorMensual:99000, fechaRegistro:addDays(-60), notas:''},
+    {id:uid(), nombre:'Spa Armonía Urbana', sector:'Spa', producto:'agendamiento', plan:'Premium', email:'reservas@armoniaurbana.com', telefono:'3023456789', ciudad:'Cali', estado:'Activo', valorMensual:249000, fechaRegistro:addDays(-40), notas:'Pidió integración con recordatorios WhatsApp.'},
+    {id:uid(), nombre:'Tattoo Studio NegroTinta', sector:'Estudio de tatuajes', producto:'agendamiento', plan:'Profesional', email:'agenda@negrotinta.ink', telefono:'3034567890', ciudad:'Bogotá', estado:'Lead', valorMensual:0, fechaRegistro:addDays(-5), notas:'En demo, decide fin de mes.'},
+    {id:uid(), nombre:'Constructora Vialpro S.A.S', sector:'Construcción', producto:'excel-bi', plan:'Empresarial', email:'finanzas@vialpro.com', telefono:'3045678901', ciudad:'Bogotá', estado:'Activo', valorMensual:650000, fechaRegistro:addDays(-120), notas:'Automatización de reportes de obra en Power BI.'},
+    {id:uid(), nombre:'Laura Jiménez (Contadora indep.)', sector:'Contabilidad', producto:'excel-bi', plan:'Individual', email:'laura.jimenez@gmail.com', telefono:'3056789012', ciudad:'Bucaramanga', estado:'Activo', valorMensual:120000, fechaRegistro:addDays(-30), notas:'Curso de macros y tablas dinámicas.'},
+    {id:uid(), nombre:'Distribuidora AlVerde', sector:'Logística', producto:'ambos', plan:'Grupal + Profesional', email:'operaciones@alverde.com', telefono:'3067890123', ciudad:'Cali', estado:'Activo', valorMensual:410000, fechaRegistro:addDays(-70), notas:'Usa agendamiento para citas de mantenimiento de flota y clases para su equipo administrativo.'},
+    {id:uid(), nombre:'Peluquería Nueva Era', sector:'Barbería', producto:'agendamiento', plan:'Básico', email:'nuevaera@gmail.com', telefono:'3078901234', ciudad:'Barranquilla', estado:'Inactivo', valorMensual:0, fechaRegistro:addDays(-200), notas:'Canceló por cierre temporal del local.'},
+    {id:uid(), nombre:'Grupo Financiero Andes', sector:'Finanzas', producto:'excel-bi', plan:'Empresarial', email:'capacitacion@grupoandes.com', telefono:'3089012345', ciudad:'Bogotá', estado:'Lead', valorMensual:0, fechaRegistro:addDays(-3), notas:'Solicitaron propuesta para 15 analistas.'},
+  ];
+
+  const ventas = [
+    {id:uid(), clienteId:clientes[3].id, producto:'agendamiento', plan:'Profesional', valor:180000, etapa:'Propuesta', fecha:addDays(-4)},
+    {id:uid(), clienteId:clientes[8].id, producto:'excel-bi', plan:'Empresarial', valor:2400000, etapa:'Negociación', fecha:addDays(-2)},
+    {id:uid(), clienteId:null, nombreLead:'Estética Piel de Seda', producto:'agendamiento', plan:'Premium', valor:249000, etapa:'Contactado', fecha:addDays(-6)},
+    {id:uid(), clienteId:null, nombreLead:'Cooperativa AgroValle', producto:'excel-bi', plan:'Grupal', valor:800000, etapa:'Prospecto', fecha:addDays(-1)},
+    {id:uid(), clienteId:clientes[2].id, producto:'agendamiento', plan:'Premium', valor:249000, etapa:'Ganado', fecha:addDays(-38)},
+    {id:uid(), clienteId:null, nombreLead:'Barbería Rústica', producto:'agendamiento', plan:'Básico', valor:99000, etapa:'Perdido', fecha:addDays(-15)},
+    {id:uid(), clienteId:clientes[6].id, producto:'ambos', plan:'Grupal + Profesional', valor:410000, etapa:'Ganado', fecha:addDays(-68)},
+  ];
+
+  const facturas = [
+    {id:uid(), clienteId:clientes[0].id, producto:'agendamiento', concepto:'Suscripción mensual - Profesional', monto:180000, fechaEmision:addDays(-10), fechaVenc:addDays(5), estado:'Pendiente'},
+    {id:uid(), clienteId:clientes[1].id, producto:'agendamiento', concepto:'Suscripción mensual - Básico', monto:99000, fechaEmision:addDays(-20), fechaVenc:addDays(-5), estado:'Vencida'},
+    {id:uid(), clienteId:clientes[2].id, producto:'agendamiento', concepto:'Suscripción mensual - Premium', monto:249000, fechaEmision:addDays(-33), fechaVenc:addDays(-18), estado:'Pagada'},
+    {id:uid(), clienteId:clientes[4].id, producto:'excel-bi', concepto:'Programa Empresarial Power BI - Cuota 2/3', monto:650000, fechaEmision:addDays(-8), fechaVenc:addDays(7), estado:'Pendiente'},
+    {id:uid(), clienteId:clientes[5].id, producto:'excel-bi', concepto:'Clases individuales Excel - Mensualidad', monto:120000, fechaEmision:addDays(-3), fechaVenc:addDays(12), estado:'Pendiente'},
+    {id:uid(), clienteId:clientes[6].id, producto:'ambos', concepto:'Paquete combinado - Mensualidad', monto:410000, fechaEmision:addDays(-40), fechaVenc:addDays(-25), estado:'Pagada'},
+  ];
+
+  const agenda = [
+    {id:uid(), clienteId:clientes[3].id, tipo:'Demo Agendamiento', fecha:addDays(1), hora:'10:00', duracion:'45 min', modalidad:'Virtual', estado:'Programada', notas:'Presentar módulo de recordatorios.'},
+    {id:uid(), clienteId:clientes[5].id, tipo:'Clase Excel', fecha:addDays(2), hora:'15:00', duracion:'60 min', modalidad:'Virtual', estado:'Programada', notas:'Tablas dinámicas y macros básicas.'},
+    {id:uid(), clienteId:clientes[4].id, tipo:'Clase Power BI', fecha:addDays(3), hora:'09:00', duracion:'90 min', modalidad:'Presencial', estado:'Programada', notas:'Dashboard de reportes de obra.'},
+    {id:uid(), clienteId:clientes[2].id, tipo:'Soporte', fecha:addDays(-1), hora:'11:30', duracion:'30 min', modalidad:'Virtual', estado:'Completada', notas:'Resuelto problema de sincronización de horarios.'},
+    {id:uid(), clienteId:clientes[8].id, tipo:'Reunión', fecha:addDays(5), hora:'14:00', duracion:'45 min', modalidad:'Virtual', estado:'Programada', notas:'Presentación de propuesta para 15 analistas.'},
+    {id:uid(), clienteId:clientes[6].id, tipo:'Clase Power BI', fecha:addDays(7), hora:'16:00', duracion:'60 min', modalidad:'Virtual', estado:'Programada', notas:''},
+  ];
+
+  const productos = {
+    agendamiento:{
+      nombre:'Sistema de Agendamiento de Citas',
+      descripcion:'Plataforma de reservas y gestión de citas online para barberías, salones de belleza, spas y estudios de tatuajes: agenda en línea, recordatorios automáticos, control de clientes y reportes de ocupación.',
+      segmentos:['Barberías','Salones de belleza','Spas','Estudios de tatuajes'],
+      planes:[
+        {nombre:'Básico', precio:99000, features:['1 sede / 2 usuarios','Agenda online 24/7','Recordatorios por email']},
+        {nombre:'Profesional', precio:180000, features:['Hasta 3 sedes','Recordatorios WhatsApp/SMS','Reportes de ocupación']},
+        {nombre:'Premium', precio:249000, features:['Sedes ilimitadas','Programa de fidelización','Soporte prioritario']},
+      ]
+    },
+    'excel-bi':{
+      nombre:'Clases Personalizadas de Excel & Power BI',
+      descripcion:'Formación práctica y personalizada para automatizar tareas rutinarias con Excel avanzado y Power BI: macros, tablas dinámicas, dashboards e informes automáticos que ahorran horas de trabajo manual.',
+      segmentos:['Profesionales independientes','Áreas contables y financieras','Equipos de operaciones','Empresas (equipos completos)'],
+      planes:[
+        {nombre:'Individual', precio:120000, features:['Clases 1 a 1','Plan de automatización personalizado','Material de apoyo incluido']},
+        {nombre:'Grupal', precio:350000, features:['Hasta 6 personas','Casos de uso del equipo','Sesiones grabadas']},
+        {nombre:'Empresarial', precio:650000, features:['Diagnóstico de procesos','Automatización a medida','Soporte post-clase 30 días']},
+      ]
+    }
+  };
+
+  const cotizaciones = [
+    {
+      id:uid(), numero:'TSC-'+new Date().getFullYear()+'-001', fecha:addDays(-6), validezDias:15, estado:'Enviada',
+      clienteId:clientes[3].id, clienteNombre:clientes[3].nombre, clienteContacto:'Encargado de sede', clienteEmail:clientes[3].email,
+      consultorNombre:'Equipo Comercial', consultorCargo:'Consultor de Soluciones', consultorContacto:'contacto@taseca.tech | +57 300 000 0000',
+      tipoServicio:'agendamiento',
+      titulo:'Implementación de Sistema de Agendamiento de Citas',
+      resumen:'El presente documento detalla la propuesta técnica y económica para la implementación del Sistema de Agendamiento de Citas de TASECA, orientado a optimizar la reserva y gestión de citas del estudio, reducir inasistencias y mejorar la experiencia de sus clientes.',
+      fases:[
+        {titulo:'Fase 1: Diagnóstico y configuración inicial', descripcion:'Levantamiento de servicios, horarios, sedes y reglas de agendamiento del negocio.'},
+        {titulo:'Fase 2: Implementación de la plataforma', descripcion:'Configuración de agenda online, recordatorios automáticos y panel de administración.'},
+        {titulo:'Fase 3: Capacitación y soporte', descripcion:'Entrenamiento al equipo y acompañamiento post-lanzamiento durante 30 días.'},
+      ],
+      items:[
+        {descripcion:'Suscripción Sistema de Agendamiento - Plan Profesional', cantidad:1, valorUnitario:180000},
+        {descripcion:'Configuración inicial y capacitación del equipo', cantidad:1, valorUnitario:150000},
+      ],
+      ivaPct:19,
+      formaPago:'50% al inicio del proyecto, 50% contra entrega a satisfacción.',
+      tiempoEjecucion:'2 semanas a partir de la firma.',
+      notasAdicionales:'Cualquier requerimiento fuera del alcance inicial será cotizado por separado.',
+    }
+  ];
+
+  return {
+    clientes, ventas, facturas, agenda, productos, cotizaciones,
+    cotizacionSeq:2,
+    config:{ empresa:'Taseca Software', moneda:'COP', consultorNombre:'Equipo Comercial', consultorCargo:'Consultor de Soluciones', consultorContacto:'contacto@taseca.tech | +57 300 000 0000' }
+  };
+}
+
+function loadState(){
+  let data;
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    data = raw ? JSON.parse(raw) : null;
+  }catch(e){ console.warn('No se pudo leer almacenamiento local', e); }
+  let changed = false;
+  if(!data){
+    data = seedData();
+    changed = true;
+  }
+  if(!Array.isArray(data.cotizaciones)){ data.cotizaciones = []; changed = true; }
+  if(typeof data.cotizacionSeq !== 'number'){ data.cotizacionSeq = 1; changed = true; }
+  if(data.config && data.config.consultorNombre === undefined){
+    data.config.consultorNombre = 'Equipo Comercial';
+    data.config.consultorCargo = 'Consultor de Soluciones';
+    data.config.consultorContacto = 'contacto@taseca.tech | +57 300 000 0000';
+    changed = true;
+  }
+  if(changed) localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  return data;
+}
+function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(STATE)); }
+
+let STATE = loadState();
+let CURRENT_VIEW = 'dashboard';
+
+/* =========================================================
+   UTILIDADES
+========================================================= */
+function formatCOP(n){
+  n = Number(n)||0;
+  return '$' + n.toLocaleString('es-CO', {maximumFractionDigits:0});
+}
+function formatDate(iso){
+  if(!iso) return '-';
+  const d = new Date(iso+'T00:00:00');
+  return d.toLocaleDateString('es-CO', {day:'2-digit', month:'short', year:'numeric'});
+}
+function daysBetween(iso){
+  const d = new Date(iso+'T00:00:00');
+  const now = new Date(); now.setHours(0,0,0,0);
+  return Math.round((d-now)/86400000);
+}
+function clienteNombre(id){
+  const c = STATE.clientes.find(c=>c.id===id);
+  return c ? c.nombre : '—';
+}
+function productLabel(p){
+  return p==='agendamiento' ? 'Agendamiento' : p==='excel-bi' ? 'Excel & Power BI' : 'Ambos productos';
+}
+function productTagClass(p){
+  return p==='agendamiento' ? 'tag-agenda' : p==='excel-bi' ? 'tag-excel' : 'tag-ambos';
+}
+function estadoBadge(estado){
+  const map = {
+    'Activo':'badge-green','Lead':'badge-blue','Inactivo':'badge-gray',
+    'Pagada':'badge-green','Pendiente':'badge-orange','Vencida':'badge-red',
+    'Prospecto':'badge-gray','Contactado':'badge-blue','Propuesta':'badge-purple',
+    'Negociación':'badge-orange','Ganado':'badge-green','Perdido':'badge-red',
+    'Programada':'badge-blue','Completada':'badge-green','Cancelada':'badge-red',
+    'Borrador':'badge-gray','Enviada':'badge-blue','Aceptada':'badge-green','Rechazada':'badge-red',
+  };
+  return map[estado] || 'badge-gray';
+}
+function toast(msg){
+  const t = document.getElementById('toast');
+  t.innerHTML = ICONS.check + '<span>'+msg+'</span>';
+  t.classList.add('show');
+  clearTimeout(window.__toastTimer);
+  window.__toastTimer = setTimeout(()=>t.classList.remove('show'), 2400);
+}
+function escapeHtml(s){
+  return String(s??'').replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+}
+
+/* =========================================================
+   NAVEGACIÓN
+========================================================= */
+const NAV = [
+  {id:'dashboard', label:'Dashboard', icon:'dashboard', sub:'Resumen general del negocio'},
+  {id:'clientes', label:'Clientes', icon:'clientes', sub:'Base de clientes y leads'},
+  {id:'ventas', label:'Ventas / Pipeline', icon:'ventas', sub:'Oportunidades comerciales'},
+  {id:'cotizaciones', label:'Cotizaciones', icon:'cotizaciones', sub:'Genera propuestas y cotizaciones'},
+  {id:'productos', label:'Productos', icon:'productos', sub:'Catálogo y planes'},
+  {id:'facturas', label:'Facturación', icon:'facturas', sub:'Cobros e ingresos'},
+  {id:'agenda', label:'Agenda', icon:'agenda', sub:'Clases, demos y citas'},
+  {id:'reportes', label:'Reportes', icon:'reportes', sub:'Indicadores del negocio'},
+  {id:'config', label:'Configuración', icon:'config', sub:'Preferencias del panel'},
+];
+
+function renderNav(){
+  const el = document.getElementById('navlinks');
+  el.innerHTML = NAV.map(n=>`
+    <button class="navitem ${n.id===CURRENT_VIEW?'active':''}" data-nav="${n.id}">
+      ${ICONS[n.icon]}<span>${n.label}</span>
+    </button>`).join('');
+  el.querySelectorAll('[data-nav]').forEach(b=>{
+    b.addEventListener('click', ()=> goTo(b.dataset.nav));
+  });
+}
+
+function goTo(view){
+  CURRENT_VIEW = view;
+  const meta = NAV.find(n=>n.id===view);
+  document.getElementById('viewTitle').textContent = meta.label;
+  document.getElementById('viewSub').textContent = meta.sub;
+  renderNav();
+  renderQuickAdd();
+  RENDERERS[view]();
+}
+
+function renderQuickAdd(){
+  const btn = document.getElementById('quickAddBtn');
+  const cfgs = {
+    dashboard:{label:'Nuevo cliente', action:()=>openClienteModal()},
+    clientes:{label:'Nuevo cliente', action:()=>openClienteModal()},
+    ventas:{label:'Nueva oportunidad', action:()=>openVentaModal()},
+    cotizaciones: cotizacionView==='list' ? {label:'Nueva cotización', action:()=>openCotizacionEditor(null)} : null,
+    productos:null,
+    facturas:{label:'Nueva factura', action:()=>openFacturaModal()},
+    agenda:{label:'Nuevo evento', action:()=>openAgendaModal()},
+    reportes:null,
+    config:null,
+  };
+  const cfg = cfgs[CURRENT_VIEW];
+  if(!cfg){ btn.style.display='none'; return; }
+  btn.style.display='inline-flex';
+  btn.innerHTML = ICONS.plus + '<span>'+cfg.label+'</span>';
+  btn.onclick = cfg.action;
+}
+
+/* =========================================================
+   MODAL genérico
+========================================================= */
+function openModal(title, bodyHtml, footHtml){
+  document.getElementById('modal').innerHTML = `
+    <div class="modal-head">
+      <h3>${title}</h3>
+      <button class="close-x" id="modalClose">&times;</button>
+    </div>
+    <div class="modal-body">${bodyHtml}</div>
+    ${footHtml ? `<div class="modal-foot">${footHtml}</div>` : ''}
+  `;
+  document.getElementById('overlay').classList.add('show');
+  document.getElementById('modalClose').onclick = closeModal;
+}
+function closeModal(){
+  document.getElementById('overlay').classList.remove('show');
+}
+document.getElementById('overlay').addEventListener('click', (e)=>{
+  if(e.target.id==='overlay') closeModal();
+});
+
+function confirmDialog(message, onConfirm){
+  openModal('Confirmar acción', `<div class="confirm-box">${message}</div>`,
+    `<button class="btn btn-outline" id="cancelBtn">Cancelar</button>
+     <button class="btn btn-danger" id="okBtn">${ICONS.trash} Eliminar</button>`);
+  document.getElementById('cancelBtn').onclick = closeModal;
+  document.getElementById('okBtn').onclick = ()=>{ onConfirm(); closeModal(); };
+}
+
+/* =========================================================
+   DASHBOARD
+========================================================= */
+function RENDER_DASHBOARD(){
+  const clientesActivos = STATE.clientes.filter(c=>c.estado==='Activo');
+  const mrr = clientesActivos.reduce((s,c)=>s+ (Number(c.valorMensual)||0), 0);
+  const mrrAgenda = clientesActivos.filter(c=>c.producto==='agendamiento').reduce((s,c)=>s+Number(c.valorMensual||0),0);
+  const mrrExcel = clientesActivos.filter(c=>c.producto==='excel-bi').reduce((s,c)=>s+Number(c.valorMensual||0),0);
+  const mrrAmbos = clientesActivos.filter(c=>c.producto==='ambos').reduce((s,c)=>s+Number(c.valorMensual||0),0);
+
+  const pipelineAbierto = STATE.ventas.filter(v=>!['Ganado','Perdido'].includes(v.etapa));
+  const pipelineValor = pipelineAbierto.reduce((s,v)=>s+Number(v.valor||0),0);
+
+  const facturasPendientes = STATE.facturas.filter(f=>f.estado!=='Pagada');
+  const facturasPendientesValor = facturasPendientes.reduce((s,f)=>s+Number(f.monto||0),0);
+
+  const leads = STATE.clientes.filter(c=>c.estado==='Lead').length;
+
+  const proximos = STATE.agenda
+    .filter(a=>a.estado==='Programada' && daysBetween(a.fecha) >= 0)
+    .sort((a,b)=> a.fecha.localeCompare(b.fecha))
+    .slice(0,5);
+
+  const etapas = ['Prospecto','Contactado','Propuesta','Negociación','Ganado','Perdido'];
+  const etapaCounts = etapas.map(e=>STATE.ventas.filter(v=>v.etapa===e).length);
+  const maxEtapa = Math.max(1, ...etapaCounts);
+
+  const totalProdMrr = mrrAgenda+mrrExcel+mrrAmbos || 1;
+  const donutStops = [
+    {label:'Agendamiento', value:mrrAgenda, color:'#5b5ff2'},
+    {label:'Excel & Power BI', value:mrrExcel, color:'#17c3b2'},
+    {label:'Ambos', value:mrrAmbos, color:'#ff9f5b'},
+  ];
+  let acc = 0;
+  const gradient = donutStops.map(s=>{
+    const pct = (s.value/totalProdMrr)*100;
+    const str = `${s.color} ${acc}% ${acc+pct}%`;
+    acc += pct;
+    return str;
+  }).join(', ');
+
+  document.getElementById('view').innerHTML = `
+    <div class="grid grid-4" style="margin-bottom:18px;">
+      <div class="card kpi">
+        <div class="label"><span class="icon" style="background:#5b5ff2">${ICONS.cash}</span>Ingresos mensuales (MRR)</div>
+        <div class="value">${formatCOP(mrr)}</div>
+        <div class="delta up">${clientesActivos.length} clientes activos generando ingresos</div>
+      </div>
+      <div class="card kpi">
+        <div class="label"><span class="icon" style="background:#17c3b2">${ICONS.users}</span>Clientes totales</div>
+        <div class="value">${STATE.clientes.length}</div>
+        <div class="delta">${leads} leads en seguimiento</div>
+      </div>
+      <div class="card kpi">
+        <div class="label"><span class="icon" style="background:#ff9f5b">${ICONS.target}</span>Pipeline abierto</div>
+        <div class="value">${formatCOP(pipelineValor)}</div>
+        <div class="delta">${pipelineAbierto.length} oportunidades activas</div>
+      </div>
+      <div class="card kpi">
+        <div class="label"><span class="icon" style="background:#e0525f">${ICONS.alert}</span>Facturas por cobrar</div>
+        <div class="value">${formatCOP(facturasPendientesValor)}</div>
+        <div class="delta ${facturasPendientes.some(f=>f.estado==='Vencida')?'down':''}">${facturasPendientes.length} pendientes de pago</div>
+      </div>
+    </div>
+
+    <div class="grid grid-2" style="margin-bottom:18px;">
+      <div class="card">
+        <div class="card-title">Pipeline por etapa <small>${STATE.ventas.length} oportunidades en total</small></div>
+        <div class="bars">
+          ${etapas.map((e,i)=>`
+            <div class="bar-row">
+              <div>${e}</div>
+              <div class="bar-track"><div class="bar-fill" style="width:${(etapaCounts[i]/maxEtapa)*100}%"></div></div>
+              <div class="bar-val">${etapaCounts[i]}</div>
+            </div>`).join('')}
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">MRR por producto</div>
+        <div class="donut-wrap">
+          <div class="donut" style="background:conic-gradient(${gradient || '#eee 0 100%'});"></div>
+          <div class="donut-legend">
+            ${donutStops.map(s=>`
+              <div class="legend-item">
+                <span class="legend-dot" style="background:${s.color}"></span>
+                <span>${s.label}</span>
+                <span class="legend-val">${formatCOP(s.value)}</span>
+              </div>`).join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid grid-2">
+      <div class="card">
+        <div class="card-title">Próximos eventos de agenda <small><a href="#" data-goto="agenda" style="color:var(--accent);text-decoration:none;">Ver todo →</a></small></div>
+        ${proximos.length ? proximos.map(a=>`
+          <div class="upcoming-item">
+            <div class="upcoming-date"><div class="d">${new Date(a.fecha+'T00:00:00').getDate()}</div><div class="m">${new Date(a.fecha+'T00:00:00').toLocaleDateString('es-CO',{month:'short'})}</div></div>
+            <div class="upcoming-info">
+              <div class="t">${a.tipo} — ${clienteNombre(a.clienteId)}</div>
+              <div class="s">${a.hora} · ${a.modalidad} · ${a.duracion}</div>
+            </div>
+          </div>`).join('') : `<div class="empty-state">${ICONS.empty}<div>No hay eventos próximos</div></div>`}
+      </div>
+      <div class="card">
+        <div class="card-title">Clientes recientes <small><a href="#" data-goto="clientes" style="color:var(--accent);text-decoration:none;">Ver todo →</a></small></div>
+        ${[...STATE.clientes].sort((a,b)=>b.fechaRegistro.localeCompare(a.fechaRegistro)).slice(0,5).map(c=>`
+          <div class="upcoming-item">
+            <div class="upcoming-info" style="flex:1;">
+              <div class="t">${escapeHtml(c.nombre)}</div>
+              <div class="s">${c.sector} · ${productLabel(c.producto)}</div>
+            </div>
+            <span class="badge ${estadoBadge(c.estado)}"><span class="badge-dot"></span>${c.estado}</span>
+          </div>`).join('')}
+      </div>
+    </div>
+  `;
+  document.querySelectorAll('[data-goto]').forEach(a=>a.addEventListener('click', e=>{e.preventDefault(); goTo(a.dataset.goto);}));
+}
+
+/* =========================================================
+   CLIENTES
+========================================================= */
+let clienteFiltro = {producto:'', estado:'', q:''};
+
+function RENDER_CLIENTES(){
+  const rows = STATE.clientes.filter(c=>{
+    if(clienteFiltro.producto && c.producto!==clienteFiltro.producto) return false;
+    if(clienteFiltro.estado && c.estado!==clienteFiltro.estado) return false;
+    if(clienteFiltro.q){
+      const q = clienteFiltro.q.toLowerCase();
+      if(!(c.nombre.toLowerCase().includes(q) || c.sector.toLowerCase().includes(q) || (c.email||'').toLowerCase().includes(q))) return false;
+    }
+    return true;
+  });
+
+  document.getElementById('view').innerHTML = `
+    <div class="card">
+      <div class="toolbar">
+        <div class="toolbar-left">
+          <select class="filter" id="fProducto">
+            <option value="">Todos los productos</option>
+            <option value="agendamiento">Agendamiento</option>
+            <option value="excel-bi">Excel & Power BI</option>
+            <option value="ambos">Ambos</option>
+          </select>
+          <select class="filter" id="fEstado">
+            <option value="">Todos los estados</option>
+            <option value="Lead">Lead</option>
+            <option value="Activo">Activo</option>
+            <option value="Inactivo">Inactivo</option>
+          </select>
+        </div>
+        <div style="font-size:12.5px;color:var(--text-dim);">${rows.length} de ${STATE.clientes.length} clientes</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Cliente</th><th>Sector</th><th>Producto</th><th>Plan</th><th>Estado</th><th>Valor mensual</th><th></th>
+          </tr></thead>
+          <tbody>
+            ${rows.length ? rows.map(c=>`
+              <tr>
+                <td>
+                  <div class="cell-strong">${escapeHtml(c.nombre)}</div>
+                  <div class="cell-dim">${escapeHtml(c.email||'')}</div>
+                </td>
+                <td>${escapeHtml(c.ciudad||'')} <span class="cell-dim">· ${escapeHtml(c.sector)}</span></td>
+                <td><span class="tag-product ${productTagClass(c.producto)}">${productLabel(c.producto)}</span></td>
+                <td class="cell-dim">${escapeHtml(c.plan||'-')}</td>
+                <td><span class="badge ${estadoBadge(c.estado)}"><span class="badge-dot"></span>${c.estado}</span></td>
+                <td class="cell-strong">${c.valorMensual ? formatCOP(c.valorMensual) : '—'}</td>
+                <td>
+                  <div class="row-actions">
+                    <button class="icon-btn" data-edit="${c.id}">${ICONS.edit}</button>
+                    <button class="icon-btn danger" data-del="${c.id}">${ICONS.trash}</button>
+                  </div>
+                </td>
+              </tr>`).join('') : `<tr><td colspan="7"><div class="empty-state">${ICONS.empty}<div>No se encontraron clientes con estos filtros</div></div></td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('fProducto').value = clienteFiltro.producto;
+  document.getElementById('fEstado').value = clienteFiltro.estado;
+  document.getElementById('fProducto').addEventListener('change', e=>{clienteFiltro.producto=e.target.value; RENDER_CLIENTES();});
+  document.getElementById('fEstado').addEventListener('change', e=>{clienteFiltro.estado=e.target.value; RENDER_CLIENTES();});
+  document.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click', ()=>openClienteModal(b.dataset.edit)));
+  document.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click', ()=>{
+    const c = STATE.clientes.find(c=>c.id===b.dataset.del);
+    confirmDialog(`¿Eliminar al cliente <b>${escapeHtml(c.nombre)}</b>? Esta acción no se puede deshacer.`, ()=>{
+      STATE.clientes = STATE.clientes.filter(x=>x.id!==c.id);
+      saveState(); RENDER_CLIENTES(); toast('Cliente eliminado');
+    });
+  }));
+}
+
+function openClienteModal(id){
+  const editing = !!id;
+  const c = editing ? STATE.clientes.find(c=>c.id===id) : {nombre:'',sector:'',producto:'agendamiento',plan:'',email:'',telefono:'',ciudad:'',estado:'Lead',valorMensual:0,notas:''};
+  openModal(editing ? 'Editar cliente' : 'Nuevo cliente', `
+    <div class="form-group"><label>Nombre / Empresa</label><input id="f_nombre" value="${escapeHtml(c.nombre)}" placeholder="Ej: Barbería El Corte Fino"></div>
+    <div class="form-row">
+      <div class="form-group"><label>Sector / Rubro</label><input id="f_sector" value="${escapeHtml(c.sector)}" placeholder="Ej: Barbería, Spa, Contabilidad..."></div>
+      <div class="form-group"><label>Ciudad</label><input id="f_ciudad" value="${escapeHtml(c.ciudad||'')}" placeholder="Ej: Bogotá"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Producto</label>
+        <select id="f_producto">
+          <option value="agendamiento" ${c.producto==='agendamiento'?'selected':''}>Agendamiento de citas</option>
+          <option value="excel-bi" ${c.producto==='excel-bi'?'selected':''}>Clases Excel & Power BI</option>
+          <option value="ambos" ${c.producto==='ambos'?'selected':''}>Ambos productos</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Plan</label><input id="f_plan" value="${escapeHtml(c.plan||'')}" placeholder="Ej: Profesional"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Email</label><input id="f_email" value="${escapeHtml(c.email||'')}" placeholder="correo@ejemplo.com"></div>
+      <div class="form-group"><label>Teléfono</label><input id="f_telefono" value="${escapeHtml(c.telefono||'')}" placeholder="300 000 0000"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Estado</label>
+        <select id="f_estado">
+          <option value="Lead" ${c.estado==='Lead'?'selected':''}>Lead</option>
+          <option value="Activo" ${c.estado==='Activo'?'selected':''}>Activo</option>
+          <option value="Inactivo" ${c.estado==='Inactivo'?'selected':''}>Inactivo</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Valor mensual (COP)</label><input id="f_valor" type="number" min="0" step="1000" value="${c.valorMensual||0}"></div>
+    </div>
+    <div class="form-group"><label>Notas</label><textarea id="f_notas" placeholder="Notas internas...">${escapeHtml(c.notas||'')}</textarea></div>
+  `, `
+    <button class="btn btn-outline" id="cancelBtn">Cancelar</button>
+    <button class="btn btn-primary" id="saveBtn">${ICONS.check} Guardar</button>
+  `);
+  document.getElementById('cancelBtn').onclick = closeModal;
+  document.getElementById('saveBtn').onclick = ()=>{
+    const nombre = document.getElementById('f_nombre').value.trim();
+    if(!nombre){ toast('El nombre es obligatorio'); return; }
+    const data = {
+      nombre,
+      sector: document.getElementById('f_sector').value.trim() || 'General',
+      ciudad: document.getElementById('f_ciudad').value.trim(),
+      producto: document.getElementById('f_producto').value,
+      plan: document.getElementById('f_plan').value.trim(),
+      email: document.getElementById('f_email').value.trim(),
+      telefono: document.getElementById('f_telefono').value.trim(),
+      estado: document.getElementById('f_estado').value,
+      valorMensual: Number(document.getElementById('f_valor').value)||0,
+      notas: document.getElementById('f_notas').value.trim(),
+    };
+    if(editing){
+      Object.assign(c, data);
+    } else {
+      STATE.clientes.push({id:uid(), fechaRegistro:todayISO(), ...data});
+    }
+    saveState(); closeModal(); RENDER_CLIENTES(); toast(editing?'Cliente actualizado':'Cliente creado');
+    if(CURRENT_VIEW==='dashboard') RENDER_DASHBOARD();
+  };
+}
+
+/* =========================================================
+   VENTAS / PIPELINE
+========================================================= */
+const ETAPAS = ['Prospecto','Contactado','Propuesta','Negociación','Ganado','Perdido'];
+
+function RENDER_VENTAS(){
+  const view = document.getElementById('view');
+  view.innerHTML = `
+    <div class="card" style="margin-bottom:18px;">
+      <div class="card-title">Valor total del pipeline abierto
+        <small>${formatCOP(STATE.ventas.filter(v=>!['Ganado','Perdido'].includes(v.etapa)).reduce((s,v)=>s+Number(v.valor||0),0))}</small>
+      </div>
+    </div>
+    <div class="kanban" id="kanban"></div>
+  `;
+  const kanban = document.getElementById('kanban');
+  kanban.innerHTML = ETAPAS.map(etapa=>{
+    const deals = STATE.ventas.filter(v=>v.etapa===etapa);
+    return `
+      <div class="kanban-col">
+        <div class="kanban-col-head"><span>${etapa}</span><span class="kanban-count">${deals.length}</span></div>
+        ${deals.map(d=>`
+          <div class="deal-card" data-deal="${d.id}">
+            <div class="name">${escapeHtml(d.clienteId ? clienteNombre(d.clienteId) : (d.nombreLead||'Sin nombre'))}</div>
+            <div class="meta"><span class="tag-product ${productTagClass(d.producto)}" style="padding:2px 7px;">${productLabel(d.producto)}</span></div>
+            <div class="meta">${escapeHtml(d.plan||'')} · ${formatDate(d.fecha)}</div>
+            <div class="val">${formatCOP(d.valor)}</div>
+          </div>`).join('')}
+        ${!deals.length ? `<div class="empty-state" style="padding:20px 8px;font-size:12px;">Sin oportunidades</div>` : ''}
+      </div>`;
+  }).join('');
+
+  kanban.querySelectorAll('[data-deal]').forEach(el=>el.addEventListener('click', ()=>openVentaModal(el.dataset.deal)));
+}
+
+function openVentaModal(id){
+  const editing = !!id;
+  const v = editing ? STATE.ventas.find(v=>v.id===id) : {clienteId:'', nombreLead:'', producto:'agendamiento', plan:'', valor:0, etapa:'Prospecto', fecha:todayISO()};
+  const clienteOptions = STATE.clientes.map(c=>`<option value="${c.id}" ${v.clienteId===c.id?'selected':''}>${escapeHtml(c.nombre)}</option>`).join('');
+  openModal(editing?'Editar oportunidad':'Nueva oportunidad', `
+    <div class="form-group"><label>Cliente existente (opcional)</label>
+      <select id="f_cliente"><option value="">— Lead sin registrar aún —</option>${clienteOptions}</select>
+    </div>
+    <div class="form-group"><label>Nombre del lead (si no está en clientes)</label>
+      <input id="f_lead" value="${escapeHtml(v.nombreLead||'')}" placeholder="Ej: Estética Piel de Seda">
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Producto</label>
+        <select id="f_producto">
+          <option value="agendamiento" ${v.producto==='agendamiento'?'selected':''}>Agendamiento de citas</option>
+          <option value="excel-bi" ${v.producto==='excel-bi'?'selected':''}>Clases Excel & Power BI</option>
+          <option value="ambos" ${v.producto==='ambos'?'selected':''}>Ambos productos</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Plan</label><input id="f_plan" value="${escapeHtml(v.plan||'')}" placeholder="Ej: Profesional"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Valor (COP)</label><input id="f_valor" type="number" min="0" step="1000" value="${v.valor||0}"></div>
+      <div class="form-group"><label>Etapa</label>
+        <select id="f_etapa">${ETAPAS.map(e=>`<option value="${e}" ${v.etapa===e?'selected':''}>${e}</option>`).join('')}</select>
+      </div>
+    </div>
+    <div class="form-group"><label>Fecha</label><input id="f_fecha" type="date" value="${v.fecha}"></div>
+  `, `
+    ${editing?`<button class="btn btn-danger" id="delBtn">${ICONS.trash} Eliminar</button>`:''}
+    <button class="btn btn-outline" id="cancelBtn">Cancelar</button>
+    <button class="btn btn-primary" id="saveBtn">${ICONS.check} Guardar</button>
+  `);
+  document.getElementById('cancelBtn').onclick = closeModal;
+  if(editing){
+    document.getElementById('delBtn').onclick = ()=>{
+      STATE.ventas = STATE.ventas.filter(x=>x.id!==v.id);
+      saveState(); closeModal(); RENDER_VENTAS(); toast('Oportunidad eliminada');
+    };
+  }
+  document.getElementById('saveBtn').onclick = ()=>{
+    const data = {
+      clienteId: document.getElementById('f_cliente').value || null,
+      nombreLead: document.getElementById('f_lead').value.trim(),
+      producto: document.getElementById('f_producto').value,
+      plan: document.getElementById('f_plan').value.trim(),
+      valor: Number(document.getElementById('f_valor').value)||0,
+      etapa: document.getElementById('f_etapa').value,
+      fecha: document.getElementById('f_fecha').value || todayISO(),
+    };
+    if(!data.clienteId && !data.nombreLead){ toast('Selecciona un cliente o escribe el nombre del lead'); return; }
+    if(editing){ Object.assign(v, data); } else { STATE.ventas.push({id:uid(), ...data}); }
+    saveState(); closeModal(); RENDER_VENTAS(); toast(editing?'Oportunidad actualizada':'Oportunidad creada');
+    if(CURRENT_VIEW==='dashboard') RENDER_DASHBOARD();
+  };
+}
+
+/* =========================================================
+   COTIZACIONES / PROPUESTAS
+========================================================= */
+const TASECA_LOGO_SVG = `<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="60" cy="60" r="54" fill="none" stroke="rgba(0,255,255,0.25)" stroke-width="0.5" stroke-dasharray="2 4"/>
+  <circle cx="22" cy="28" r="1.5" fill="#FFD700"/><circle cx="95" cy="40" r="1.5" fill="#00FFFF"/><circle cx="45" cy="110" r="1.5" fill="#FFD700"/>
+  <polygon points="60,12 108,95 12,95" fill="none" stroke="#FFD700" stroke-width="3" stroke-linejoin="round"/>
+  <polygon points="60,20 100,90 20,90" fill="none" stroke="rgba(0,255,255,0.4)" stroke-width="1" stroke-dasharray="3 3"/>
+  <path d="M 35 52 Q 60 30 85 52 Q 60 74 35 52" fill="none" stroke="#FFD700" stroke-width="2.5"/>
+  <circle cx="60" cy="52" r="8" fill="none" stroke="#00FFFF" stroke-width="2.5"/><circle cx="60" cy="52" r="3" fill="#00FFFF"/>
+  <line x1="60" y1="28" x2="60" y2="38" stroke="#00FFFF" stroke-width="1.5"/>
+  <rect x="42" y="78" width="5" height="6" fill="#00FFFF"/><rect x="50" y="70" width="5" height="14" fill="#FFD700"/>
+  <rect x="58" y="74" width="5" height="10" fill="#FFD700"/><rect x="66" y="72" width="5" height="12" fill="#00FFFF"/>
+</svg>`;
+
+const COTIZACION_PRESETS = {
+  agendamiento:{
+    titulo:'Implementación de Sistema de Agendamiento de Citas',
+    resumen:'El presente documento detalla la propuesta técnica y económica para la implementación del Sistema de Agendamiento de Citas de TASECA, orientado a optimizar la reserva y gestión de citas del negocio, reducir inasistencias y mejorar la experiencia de los clientes finales.',
+    fases:[
+      {titulo:'Fase 1: Diagnóstico y configuración inicial', descripcion:'Levantamiento de servicios, horarios, sedes y reglas de agendamiento del negocio.'},
+      {titulo:'Fase 2: Implementación de la plataforma', descripcion:'Configuración de agenda online, recordatorios automáticos y panel de administración.'},
+      {titulo:'Fase 3: Capacitación y soporte', descripcion:'Entrenamiento al equipo y acompañamiento post-lanzamiento durante 30 días.'},
+    ],
+    items:[{descripcion:'Suscripción Sistema de Agendamiento - Plan Profesional', cantidad:1, valorUnitario:180000}],
+  },
+  'excel-bi':{
+    titulo:'Programa de Automatización con Excel & Power BI',
+    resumen:'El presente documento detalla la propuesta técnica y económica para el programa de formación y automatización de procesos rutinarios mediante Excel avanzado y Power BI, orientado a reducir tiempos operativos y mejorar la calidad de la información para la toma de decisiones.',
+    fases:[
+      {titulo:'Fase 1: Diagnóstico de procesos', descripcion:'Identificación de tareas rutinarias y procesos susceptibles de automatización.'},
+      {titulo:'Fase 2: Formación y automatización', descripcion:'Sesiones prácticas de macros, tablas dinámicas y construcción de dashboards en Power BI.'},
+      {titulo:'Fase 3: Acompañamiento', descripcion:'Soporte post-clase para consolidar la adopción de las herramientas entregadas.'},
+    ],
+    items:[{descripcion:'Programa de clases personalizadas Excel & Power BI', cantidad:1, valorUnitario:350000}],
+  },
+  mvp:{
+    titulo:'Desarrollo de MVP (Producto Mínimo Viable)',
+    resumen:'El presente documento detalla la propuesta técnica y económica para el diseño y desarrollo de un Producto Mínimo Viable (MVP), orientado a validar la propuesta de valor del proyecto con el menor tiempo y costo posible, sobre una base técnica sólida y escalable.',
+    fases:[
+      {titulo:'Fase 1: Descubrimiento y alcance', descripcion:'Definición de funcionalidades clave, flujos de usuario y arquitectura técnica del MVP.'},
+      {titulo:'Fase 2: Diseño UX/UI', descripcion:'Prototipado de interfaces y validación de la experiencia de usuario.'},
+      {titulo:'Fase 3: Desarrollo e integración', descripcion:'Construcción del producto, integración de servicios y pruebas funcionales.'},
+      {titulo:'Fase 4: Despliegue y entrega', descripcion:'Publicación del MVP, capacitación básica y entrega de documentación técnica.'},
+    ],
+    items:[{descripcion:'Desarrollo de MVP a la medida', cantidad:1, valorUnitario:0}],
+  },
+  camaras:{
+    titulo:'Instalación, Mantenimiento y Suministro de Cámaras de Seguridad',
+    resumen:'El presente documento detalla la propuesta técnica y económica para el suministro, instalación y mantenimiento de un sistema de videovigilancia, orientado a fortalecer la seguridad del sitio y permitir el monitoreo remoto de las instalaciones.',
+    fases:[
+      {titulo:'Fase 1: Diagnóstico del sitio', descripcion:'Visita técnica, definición de puntos de cámara y diseño del sistema de videovigilancia.'},
+      {titulo:'Fase 2: Suministro e instalación', descripcion:'Entrega e instalación de cámaras, cableado, grabador (NVR/DVR) y almacenamiento.'},
+      {titulo:'Fase 3: Configuración y pruebas', descripcion:'Configuración de acceso remoto, pruebas de grabación y capacitación de uso.'},
+      {titulo:'Fase 4: Mantenimiento', descripcion:'Plan de mantenimiento preventivo y soporte técnico periódico.'},
+    ],
+    items:[
+      {descripcion:'Cámara de seguridad HD con visión nocturna (instalada)', cantidad:4, valorUnitario:220000},
+      {descripcion:'Grabador NVR/DVR con disco duro incluido', cantidad:1, valorUnitario:650000},
+      {descripcion:'Mano de obra, cableado y configuración', cantidad:1, valorUnitario:400000},
+    ],
+  },
+  personalizado:{
+    titulo:'',
+    resumen:'',
+    fases:[{titulo:'Fase 1: ', descripcion:''}],
+    items:[{descripcion:'', cantidad:1, valorUnitario:0}],
+  },
+};
+const TIPO_SERVICIO_LABEL = {
+  agendamiento:'Sistema de Agendamiento de Citas',
+  'excel-bi':'Clases Excel & Power BI',
+  mvp:'Desarrollo de MVP',
+  camaras:'Instalación / Mantenimiento de Cámaras',
+  personalizado:'Servicio personalizado',
+};
+
+let cotizacionView = 'list';
+let cotizacionListFiltro = {estado:''};
+let editingCotizacion = null;
+
+function computeTotals(cot){
+  const subtotal = (cot.items||[]).reduce((s,it)=> s + (Number(it.cantidad)||0)*(Number(it.valorUnitario)||0), 0);
+  const ivaValor = subtotal * ((Number(cot.ivaPct)||0)/100);
+  return {subtotal, ivaValor, total: subtotal+ivaValor};
+}
+
+function RENDER_COTIZACIONES(){
+  if(cotizacionView==='editor'){ renderCotizacionEditor(); }
+  else { renderCotizacionList(); }
+}
+
+function renderCotizacionList(){
+  document.getElementById('viewTitle').textContent = 'Cotizaciones';
+  document.getElementById('viewSub').textContent = 'Genera propuestas y cotizaciones para tus clientes';
+  const rows = STATE.cotizaciones
+    .filter(c=> !cotizacionListFiltro.estado || c.estado===cotizacionListFiltro.estado)
+    .sort((a,b)=> (b.fecha||'').localeCompare(a.fecha||''));
+
+  document.getElementById('view').innerHTML = `
+    <div class="card">
+      <div class="toolbar">
+        <div class="toolbar-left">
+          <select class="filter" id="fEstadoCotizacion">
+            <option value="">Todos los estados</option>
+            <option value="Borrador">Borrador</option>
+            <option value="Enviada">Enviada</option>
+            <option value="Aceptada">Aceptada</option>
+            <option value="Rechazada">Rechazada</option>
+          </select>
+        </div>
+        <div style="font-size:12.5px;color:var(--text-dim);">${rows.length} cotizaciones</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>N°</th><th>Cliente</th><th>Proyecto</th><th>Servicio</th><th>Total</th><th>Fecha</th><th>Estado</th><th></th></tr></thead>
+          <tbody>
+            ${rows.length ? rows.map(c=>{
+              const t = computeTotals(c);
+              return `
+              <tr>
+                <td class="cell-dim" style="font-family:monospace;">${escapeHtml(c.numero||'—')}</td>
+                <td class="cell-strong">${escapeHtml(c.clienteNombre||'Sin definir')}</td>
+                <td class="cell-dim">${escapeHtml(c.titulo||'-')}</td>
+                <td><span class="tag-product tag-ambos">${TIPO_SERVICIO_LABEL[c.tipoServicio]||'Personalizado'}</span></td>
+                <td class="quote-total-chip">${formatCOP(t.total)}</td>
+                <td class="cell-dim">${formatDate(c.fecha)}</td>
+                <td>
+                  <select class="estado-select ${estadoBadge(c.estado)}" data-estado="${c.id}">
+                    ${['Borrador','Enviada','Aceptada','Rechazada'].map(e=>`<option value="${e}" ${c.estado===e?'selected':''}>${e}</option>`).join('')}
+                  </select>
+                </td>
+                <td>
+                  <div class="row-actions">
+                    <button class="icon-btn" data-open="${c.id}" title="Ver / editar">${ICONS.edit}</button>
+                    <button class="icon-btn" data-dup="${c.id}" title="Duplicar">${ICONS.copy}</button>
+                    <button class="icon-btn danger" data-del="${c.id}" title="Eliminar">${ICONS.trash}</button>
+                  </div>
+                </td>
+              </tr>`;
+            }).join('') : `<tr><td colspan="8"><div class="empty-state">${ICONS.empty}<div>Aún no has creado cotizaciones. Usa "Nueva cotización" para empezar.</div></div></td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+
+  document.getElementById('fEstadoCotizacion').value = cotizacionListFiltro.estado;
+  document.getElementById('fEstadoCotizacion').addEventListener('change', e=>{cotizacionListFiltro.estado=e.target.value; renderCotizacionList();});
+  document.querySelectorAll('[data-open]').forEach(b=>b.addEventListener('click', ()=>openCotizacionEditor(b.dataset.open)));
+  document.querySelectorAll('[data-estado]').forEach(sel=>sel.addEventListener('change', e=>{
+    const c = STATE.cotizaciones.find(c=>c.id===sel.dataset.estado);
+    c.estado = e.target.value; saveState(); renderCotizacionList(); toast('Estado actualizado');
+  }));
+  document.querySelectorAll('[data-dup]').forEach(b=>b.addEventListener('click', ()=>{
+    const orig = STATE.cotizaciones.find(c=>c.id===b.dataset.dup);
+    const copy = JSON.parse(JSON.stringify(orig));
+    copy.id = uid();
+    copy.numero = 'TSC-'+new Date().getFullYear()+'-'+String(STATE.cotizacionSeq).padStart(3,'0');
+    STATE.cotizacionSeq++;
+    copy.fecha = todayISO();
+    copy.estado = 'Borrador';
+    STATE.cotizaciones.push(copy);
+    saveState(); renderCotizacionList(); toast('Cotización duplicada');
+  }));
+  document.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click', ()=>{
+    const c = STATE.cotizaciones.find(c=>c.id===b.dataset.del);
+    confirmDialog(`¿Eliminar la cotización <b>${escapeHtml(c.numero||'')}</b> de <b>${escapeHtml(c.clienteNombre||'')}</b>?`, ()=>{
+      STATE.cotizaciones = STATE.cotizaciones.filter(x=>x.id!==c.id);
+      saveState(); renderCotizacionList(); toast('Cotización eliminada');
+    });
+  }));
+}
+
+function blankCotizacion(){
+  return {
+    id:null, numero:null, fecha:todayISO(), validezDias:15, estado:'Borrador',
+    clienteId:'', clienteNombre:'', clienteContacto:'', clienteEmail:'',
+    consultorNombre:STATE.config.consultorNombre||'Equipo Comercial',
+    consultorCargo:STATE.config.consultorCargo||'Consultor de Soluciones',
+    consultorContacto:STATE.config.consultorContacto||'contacto@taseca.tech',
+    tipoServicio:'personalizado',
+    titulo:'', resumen:'',
+    fases:JSON.parse(JSON.stringify(COTIZACION_PRESETS.personalizado.fases)),
+    items:JSON.parse(JSON.stringify(COTIZACION_PRESETS.personalizado.items)),
+    ivaPct:19,
+    formaPago:'50% al inicio del proyecto, 50% contra entrega a satisfacción.',
+    tiempoEjecucion:'',
+    notasAdicionales:'Cualquier requerimiento fuera del alcance inicial será cotizado por separado.',
+  };
+}
+
+function openCotizacionEditor(id){
+  if(id){
+    const found = STATE.cotizaciones.find(c=>c.id===id);
+    editingCotizacion = JSON.parse(JSON.stringify(found));
+  } else {
+    editingCotizacion = blankCotizacion();
+  }
+  cotizacionView = 'editor';
+  goTo('cotizaciones');
+}
+
+function backToCotizacionList(){
+  cotizacionView = 'list';
+  editingCotizacion = null;
+  goTo('cotizaciones');
+}
+
+function renderCotizacionEditor(){
+  const isNew = !editingCotizacion.id;
+  document.getElementById('viewTitle').textContent = isNew ? 'Nueva cotización' : `Editando ${editingCotizacion.numero||''}`;
+  document.getElementById('viewSub').textContent = editingCotizacion.clienteNombre ? `Para: ${editingCotizacion.clienteNombre}` : 'Completa los datos para generar la propuesta';
+
+  document.getElementById('view').innerHTML = `
+    <div class="qe-toolbar">
+      <button class="btn btn-outline" id="qeBack">${ICONS.arrowLeft} Volver al listado</button>
+      <div class="qe-toolbar-actions">
+        <button class="btn btn-outline" id="qePrint">${ICONS.printer} Imprimir / PDF</button>
+        <button class="btn btn-primary" id="qeSave">${ICONS.check} Guardar cotización</button>
+      </div>
+    </div>
+    <div class="qe-layout">
+      <div class="qe-form" id="qeForm"></div>
+      <div class="qe-sticky"><div id="qpPreview"></div></div>
+    </div>
+  `;
+  document.getElementById('qeBack').onclick = backToCotizacionList;
+  document.getElementById('qePrint').onclick = ()=> window.print();
+  document.getElementById('qeSave').onclick = saveCotizacion;
+
+  renderQEForm();
+  renderQPPreview();
+}
+
+function renderQEForm(){
+  const cot = editingCotizacion;
+  const clienteOptions = STATE.clientes.map(c=>`<option value="${c.id}" ${cot.clienteId===c.id?'selected':''}>${escapeHtml(c.nombre)}</option>`).join('');
+
+  document.getElementById('qeForm').innerHTML = `
+    <div class="card">
+      <div class="qe-section-title"><span class="num">1</span>Datos de la cotización</div>
+      <div class="form-row">
+        <div class="form-group"><label>Número</label><input value="${escapeHtml(cot.numero || 'Se asigna al guardar')}" disabled></div>
+        <div class="form-group"><label>Estado</label>
+          <select id="q_estado">${['Borrador','Enviada','Aceptada','Rechazada'].map(e=>`<option value="${e}" ${cot.estado===e?'selected':''}>${e}</option>`).join('')}</select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Fecha</label><input id="q_fecha" type="date" value="${cot.fecha}"></div>
+        <div class="form-group"><label>Validez (días hábiles)</label><input id="q_validez" type="number" min="1" value="${cot.validezDias}"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="qe-section-title"><span class="num">2</span>Cliente</div>
+      <div class="form-group"><label>Vincular cliente existente (opcional)</label>
+        <select id="q_clienteId"><option value="">— Prospecto nuevo, escribir manualmente —</option>${clienteOptions}</select>
+      </div>
+      <div class="form-group"><label>Nombre del cliente / empresa</label><input id="q_clienteNombre" value="${escapeHtml(cot.clienteNombre)}" placeholder="Ej: Barbería El Corte Fino"></div>
+      <div class="form-row">
+        <div class="form-group"><label>Atención a (contacto)</label><input id="q_clienteContacto" value="${escapeHtml(cot.clienteContacto)}" placeholder="Nombre del contacto"></div>
+        <div class="form-group"><label>Correo del cliente</label><input id="q_clienteEmail" value="${escapeHtml(cot.clienteEmail)}" placeholder="correo@cliente.com"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="qe-section-title"><span class="num">3</span>Presentado por</div>
+      <div class="form-row">
+        <div class="form-group"><label>Nombre / Equipo</label><input id="q_consultorNombre" value="${escapeHtml(cot.consultorNombre)}"></div>
+        <div class="form-group"><label>Cargo</label><input id="q_consultorCargo" value="${escapeHtml(cot.consultorCargo)}"></div>
+      </div>
+      <div class="form-group"><label>Contacto (email / teléfono)</label><input id="q_consultorContacto" value="${escapeHtml(cot.consultorContacto)}"></div>
+    </div>
+
+    <div class="card">
+      <div class="qe-section-title"><span class="num">4</span>Tipo de servicio</div>
+      <div class="qe-preset-row">
+        <div class="form-group"><label>Servicio a cotizar</label>
+          <select id="q_tipoServicio">
+            <option value="agendamiento" ${cot.tipoServicio==='agendamiento'?'selected':''}>Sistema de Agendamiento de Citas</option>
+            <option value="excel-bi" ${cot.tipoServicio==='excel-bi'?'selected':''}>Clases Excel & Power BI</option>
+            <option value="mvp" ${cot.tipoServicio==='mvp'?'selected':''}>Desarrollo de MVP</option>
+            <option value="camaras" ${cot.tipoServicio==='camaras'?'selected':''}>Instalación / Mantenimiento de Cámaras</option>
+            <option value="personalizado" ${cot.tipoServicio==='personalizado'?'selected':''}>Servicio 100% personalizado</option>
+          </select>
+        </div>
+        <button class="btn btn-outline btn-sm" id="q_usarPlantilla" type="button">Usar plantilla</button>
+      </div>
+      <div class="form-hint">La plantilla precarga título, resumen, fases e ítems editables — no reemplaza tu contenido hasta que confirmes.</div>
+    </div>
+
+    <div class="card">
+      <div class="qe-section-title"><span class="num">5</span>Proyecto</div>
+      <div class="form-group"><label>Título del proyecto / servicio</label><input id="q_titulo" value="${escapeHtml(cot.titulo)}" placeholder="Ej: Instalación de sistema de cámaras de seguridad"></div>
+      <div class="form-group"><label>Resumen del requerimiento</label><textarea id="q_resumen" style="min-height:100px;" placeholder="Describe el objetivo y alcance general de la propuesta...">${escapeHtml(cot.resumen)}</textarea></div>
+    </div>
+
+    <div class="card">
+      <div class="qe-section-title"><span class="num">6</span>Alcance y fases</div>
+      <div id="q_fases"></div>
+      <button class="btn btn-outline btn-sm qe-add-row" id="q_addFase" type="button">${ICONS.plus} Agregar fase</button>
+    </div>
+
+    <div class="card">
+      <div class="qe-section-title"><span class="num">7</span>Ítems de la cotización</div>
+      <div id="q_items"></div>
+      <button class="btn btn-outline btn-sm qe-add-row" id="q_addItem" type="button">${ICONS.plus} Agregar ítem</button>
+      <div class="form-group" style="margin-top:14px;max-width:160px;"><label>IVA (%)</label><input id="q_iva" type="number" min="0" max="100" value="${cot.ivaPct}"></div>
+    </div>
+
+    <div class="card">
+      <div class="qe-section-title"><span class="num">8</span>Condiciones comerciales</div>
+      <div class="form-group"><label>Forma de pago</label><input id="q_formaPago" value="${escapeHtml(cot.formaPago)}"></div>
+      <div class="form-group"><label>Tiempo de ejecución</label><input id="q_tiempoEjecucion" value="${escapeHtml(cot.tiempoEjecucion)}" placeholder="Ej: 3 semanas a partir de la firma"></div>
+      <div class="form-group"><label>Notas adicionales</label><textarea id="q_notas">${escapeHtml(cot.notasAdicionales)}</textarea></div>
+    </div>
+  `;
+
+  // --- listeners: campos simples (solo re-renderizan la vista previa) ---
+  const bindText = (id, field) => {
+    document.getElementById(id).addEventListener('input', e=>{ cot[field] = e.target.value; renderQPPreview(); });
+  };
+  bindText('q_fecha','fecha'); bindText('q_clienteNombre','clienteNombre'); bindText('q_clienteContacto','clienteContacto');
+  bindText('q_clienteEmail','clienteEmail'); bindText('q_consultorNombre','consultorNombre'); bindText('q_consultorCargo','consultorCargo');
+  bindText('q_consultorContacto','consultorContacto'); bindText('q_titulo','titulo'); bindText('q_resumen','resumen');
+  bindText('q_formaPago','formaPago'); bindText('q_tiempoEjecucion','tiempoEjecucion'); bindText('q_notas','notasAdicionales');
+
+  document.getElementById('q_estado').addEventListener('change', e=>{ cot.estado = e.target.value; renderQPPreview(); });
+  document.getElementById('q_validez').addEventListener('input', e=>{ cot.validezDias = Number(e.target.value)||0; renderQPPreview(); });
+  document.getElementById('q_iva').addEventListener('input', e=>{ cot.ivaPct = Number(e.target.value)||0; renderQPPreview(); });
+
+  document.getElementById('q_clienteId').addEventListener('change', e=>{
+    cot.clienteId = e.target.value;
+    if(cot.clienteId){
+      const c = STATE.clientes.find(c=>c.id===cot.clienteId);
+      cot.clienteNombre = c.nombre; cot.clienteEmail = c.email || '';
+    }
+    renderQEForm(); renderQPPreview();
+  });
+
+  document.getElementById('q_tipoServicio').addEventListener('change', e=>{ cot.tipoServicio = e.target.value; });
+  document.getElementById('q_usarPlantilla').addEventListener('click', ()=>{
+    const applyPreset = ()=>{
+      const p = COTIZACION_PRESETS[cot.tipoServicio];
+      cot.titulo = p.titulo; cot.resumen = p.resumen;
+      cot.fases = JSON.parse(JSON.stringify(p.fases));
+      cot.items = JSON.parse(JSON.stringify(p.items));
+      renderQEForm(); renderQPPreview(); toast('Plantilla aplicada, puedes editarla libremente');
+    };
+    const hasContent = cot.titulo || cot.resumen || cot.items.some(i=>i.descripcion);
+    if(hasContent){
+      confirmDialog('Esto reemplazará el título, resumen, fases e ítems actuales por la plantilla del servicio seleccionado. ¿Continuar?', applyPreset);
+    } else { applyPreset(); }
+  });
+
+  // --- fases dinámicas ---
+  const fasesWrap = document.getElementById('q_fases');
+  fasesWrap.innerHTML = cot.fases.map((f,i)=>`
+    <div class="qe-line">
+      <div class="qe-line-fields">
+        <input data-fase-titulo="${i}" value="${escapeHtml(f.titulo)}" placeholder="Título de la fase">
+        <textarea data-fase-desc="${i}" style="min-height:52px;" placeholder="Descripción de la fase">${escapeHtml(f.descripcion)}</textarea>
+      </div>
+      <button class="qe-remove" data-fase-del="${i}" type="button">${ICONS.trash}</button>
+    </div>
+  `).join('');
+  fasesWrap.querySelectorAll('[data-fase-titulo]').forEach(el=>el.addEventListener('input', e=>{ cot.fases[+el.dataset.faseTitulo].titulo = e.target.value; renderQPPreview(); }));
+  fasesWrap.querySelectorAll('[data-fase-desc]').forEach(el=>el.addEventListener('input', e=>{ cot.fases[+el.dataset.faseDesc].descripcion = e.target.value; renderQPPreview(); }));
+  fasesWrap.querySelectorAll('[data-fase-del]').forEach(el=>el.addEventListener('click', ()=>{
+    cot.fases.splice(+el.dataset.faseDel,1); renderQEForm(); renderQPPreview();
+  }));
+  document.getElementById('q_addFase').addEventListener('click', ()=>{
+    cot.fases.push({titulo:`Fase ${cot.fases.length+1}: `, descripcion:''}); renderQEForm(); renderQPPreview();
+  });
+
+  // --- items dinámicos ---
+  const itemsWrap = document.getElementById('q_items');
+  itemsWrap.innerHTML = cot.items.map((it,i)=>`
+    <div class="qe-item-grid">
+      <input data-item-desc="${i}" value="${escapeHtml(it.descripcion)}" placeholder="Descripción del ítem / servicio">
+      <input data-item-cant="${i}" type="number" min="0" step="1" value="${it.cantidad}" title="Cantidad">
+      <input data-item-valor="${i}" type="number" min="0" step="1000" value="${it.valorUnitario}" title="Valor unitario">
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div class="qe-item-total" style="flex:1;">${formatCOP((Number(it.cantidad)||0)*(Number(it.valorUnitario)||0))}</div>
+        <button class="qe-remove" data-item-del="${i}" type="button">${ICONS.trash}</button>
+      </div>
+    </div>
+  `).join('');
+  itemsWrap.querySelectorAll('[data-item-desc]').forEach(el=>el.addEventListener('input', e=>{ cot.items[+el.dataset.itemDesc].descripcion = e.target.value; renderQPPreview(); }));
+  itemsWrap.querySelectorAll('[data-item-cant]').forEach(el=>el.addEventListener('input', e=>{ cot.items[+el.dataset.itemCant].cantidad = Number(e.target.value)||0; renderQEForm(); renderQPPreview(); }));
+  itemsWrap.querySelectorAll('[data-item-valor]').forEach(el=>el.addEventListener('input', e=>{ cot.items[+el.dataset.itemValor].valorUnitario = Number(e.target.value)||0; renderQEForm(); renderQPPreview(); }));
+  itemsWrap.querySelectorAll('[data-item-del]').forEach(el=>el.addEventListener('click', ()=>{
+    cot.items.splice(+el.dataset.itemDel,1); renderQEForm(); renderQPPreview();
+  }));
+  document.getElementById('q_addItem').addEventListener('click', ()=>{
+    cot.items.push({descripcion:'', cantidad:1, valorUnitario:0}); renderQEForm(); renderQPPreview();
+  });
+}
+
+function renderQPPreview(){
+  const cot = editingCotizacion;
+  const t = computeTotals(cot);
+  const numeroPreview = cot.numero || ('TSC-'+new Date().getFullYear()+'-'+String(STATE.cotizacionSeq).padStart(3,'0')+' (borrador)');
+
+  document.getElementById('qpPreview').innerHTML = `
+    <div class="qp-outer qp-print-area">
+      <div class="qp-card">
+        <div class="qp-head">
+          <div class="qp-brand">
+            <div class="qp-logo">${TASECA_LOGO_SVG}</div>
+            <div>
+              <h1 class="qp-tech qp-brand-name">TASECA</h1>
+              <div class="qp-brand-sub">The All-Seeing Eye · Consulting Analytics /&gt;</div>
+            </div>
+          </div>
+          <div class="qp-meta">
+            <h2 class="qp-tech">PROPUESTA DE SERVICIOS</h2>
+            <p>Cotización N°: <span class="v">${escapeHtml(numeroPreview)}</span></p>
+            <p>Fecha: <span class="v">${formatDate(cot.fecha)}</span></p>
+            <p>Validez: <span class="v">${cot.validezDias} días hábiles</span></p>
+          </div>
+        </div>
+
+        <div class="qp-cols">
+          <div class="qp-box">
+            <h3>Preparado Para</h3>
+            <h4>${escapeHtml(cot.clienteNombre || '[Nombre del Cliente / Empresa]')}</h4>
+            <p>${cot.clienteContacto ? 'Atención: '+escapeHtml(cot.clienteContacto) : 'Atención: [Nombre del Contacto]'}</p>
+            <p>${escapeHtml(cot.clienteEmail || '[Correo del Cliente]')}</p>
+          </div>
+          <div class="qp-box gold">
+            <h3>Presentado Por</h3>
+            <h4>${escapeHtml(cot.consultorNombre || 'TASECA Team')}</h4>
+            <p>${escapeHtml(cot.consultorCargo || '')}</p>
+            <p>${escapeHtml(cot.consultorContacto || '')}</p>
+          </div>
+        </div>
+
+        <div class="qp-section">
+          <h3>1. Resumen del Requerimiento</h3>
+          <p class="desc">${escapeHtml(cot.resumen || 'Describe aquí el objetivo general de la propuesta...').replace(/\n/g,'<br>')}</p>
+        </div>
+
+        <div class="qp-section">
+          <h3>2. Alcance y Entregables</h3>
+          ${cot.fases.map(f=>`
+            <div class="qp-fase">
+              <div class="qp-fase-arrow">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg>
+              </div>
+              <div>
+                <h4>${escapeHtml(f.titulo || 'Fase sin título')}</h4>
+                <p>${escapeHtml(f.descripcion || '')}</p>
+              </div>
+            </div>`).join('')}
+        </div>
+
+        <div class="qp-section">
+          <h3>3. Inversión Económica</h3>
+          <table class="qp-table">
+            <thead><tr><th>Descripción del Servicio / Ítem</th><th>Cant.</th><th>Valor Unit.</th><th>Total</th></tr></thead>
+            <tbody>
+              ${cot.items.map(it=>`
+                <tr>
+                  <td>${escapeHtml(it.descripcion || 'Ítem sin descripción')}</td>
+                  <td>${it.cantidad}</td>
+                  <td>${formatCOP(it.valorUnitario)}</td>
+                  <td>${formatCOP((Number(it.cantidad)||0)*(Number(it.valorUnitario)||0))}</td>
+                </tr>`).join('')}
+            </tbody>
+          </table>
+          <div class="qp-totals">
+            <div class="qp-totals-box">
+              <div class="qp-totals-row"><span>Subtotal:</span><span>${formatCOP(t.subtotal)}</span></div>
+              <div class="qp-totals-row"><span>Impuestos (IVA ${cot.ivaPct}%):</span><span>${formatCOP(t.ivaValor)}</span></div>
+              <div class="qp-totals-final"><span>Total Inversión:</span><span>${formatCOP(t.total)} COP</span></div>
+            </div>
+          </div>
+        </div>
+
+        <div class="qp-cond">
+          <div>
+            <h4>Condiciones Comerciales</h4>
+            <ul>
+              <li><strong>Forma de pago:</strong> ${escapeHtml(cot.formaPago || '-')}</li>
+              <li><strong>Tiempo de ejecución:</strong> ${escapeHtml(cot.tiempoEjecucion || '-')}</li>
+              <li>Los valores expresados se encuentran en Pesos Colombianos (COP).</li>
+              <li>${escapeHtml(cot.notasAdicionales || '')}</li>
+            </ul>
+          </div>
+          <div class="qp-sign">
+            <div class="line"></div>
+            <div class="name">Firma Autorizada TASECA</div>
+            <p style="font-size:11px;">Departamento Comercial</p>
+          </div>
+        </div>
+
+        <div class="qp-foot">
+          <p><strong>TASECA</strong> | The All-Seeing Eye Consulting Analytics &lt;/&gt;</p>
+          <p>Bogotá, Colombia | taseca.tech</p>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function saveCotizacion(){
+  const cot = editingCotizacion;
+  if(!cot.clienteNombre.trim()){ toast('Escribe el nombre del cliente antes de guardar'); return; }
+  if(!cot.titulo.trim()){ toast('Escribe el título del proyecto antes de guardar'); return; }
+  const isNew = !cot.id;
+  if(isNew){
+    cot.id = uid();
+    cot.numero = 'TSC-'+new Date().getFullYear()+'-'+String(STATE.cotizacionSeq).padStart(3,'0');
+    STATE.cotizacionSeq++;
+    STATE.cotizaciones.push(cot);
+  } else {
+    const idx = STATE.cotizaciones.findIndex(c=>c.id===cot.id);
+    STATE.cotizaciones[idx] = cot;
+  }
+  saveState();
+  toast(isNew ? 'Cotización creada' : 'Cotización actualizada');
+  renderCotizacionEditor();
+  if(CURRENT_VIEW==='dashboard') RENDER_DASHBOARD();
+}
+
+/* =========================================================
+   PRODUCTOS
+========================================================= */
+function RENDER_PRODUCTOS(){
+  const p1 = STATE.productos.agendamiento;
+  const p2 = STATE.productos['excel-bi'];
+  const clientesPorProducto = (key)=>STATE.clientes.filter(c=>c.producto===key || c.producto==='ambos').length;
+
+  function productBlock(key, p, heroClass){
+    return `
+      <div class="product-hero ${heroClass}">
+        <h2>${p.nombre}</h2>
+        <p>${p.descripcion}</p>
+        <div class="segmentos">${p.segmentos.map(s=>`<span class="segmento-chip" style="background:rgba(255,255,255,.15);color:#fff;border-color:rgba(255,255,255,.25);">${s}</span>`).join('')}</div>
+      </div>
+      <div class="plan-grid">
+        ${p.planes.map((pl,i)=>`
+          <div class="plan-card">
+            <div class="stat">${clientesPorProducto(key)} clientes</div>
+            <h4>${pl.nombre}</h4>
+            <div class="price">${formatCOP(pl.precio)} <span>/ mes</span></div>
+            <ul>${pl.features.map(f=>`<li>${f}</li>`).join('')}</ul>
+          </div>`).join('')}
+      </div>
+    `;
+  }
+
+  document.getElementById('view').innerHTML = `
+    <div style="margin-bottom:30px;">${productBlock('agendamiento', p1, 'p1')}</div>
+    <div>${productBlock('excel-bi', p2, 'p2')}</div>
+  `;
+}
+
+/* =========================================================
+   FACTURACIÓN
+========================================================= */
+let facturaFiltro = {estado:''};
+
+function RENDER_FACTURAS(){
+  const rows = STATE.facturas.filter(f=> !facturaFiltro.estado || f.estado===facturaFiltro.estado);
+  const totalPagado = STATE.facturas.filter(f=>f.estado==='Pagada').reduce((s,f)=>s+Number(f.monto||0),0);
+  const totalPendiente = STATE.facturas.filter(f=>f.estado==='Pendiente').reduce((s,f)=>s+Number(f.monto||0),0);
+  const totalVencido = STATE.facturas.filter(f=>f.estado==='Vencida').reduce((s,f)=>s+Number(f.monto||0),0);
+
+  document.getElementById('view').innerHTML = `
+    <div class="grid grid-3" style="margin-bottom:18px;">
+      <div class="card kpi"><div class="label">Cobrado</div><div class="value" style="color:var(--ok)">${formatCOP(totalPagado)}</div></div>
+      <div class="card kpi"><div class="label">Pendiente</div><div class="value" style="color:var(--warn)">${formatCOP(totalPendiente)}</div></div>
+      <div class="card kpi"><div class="label">Vencido</div><div class="value" style="color:var(--danger)">${formatCOP(totalVencido)}</div></div>
+    </div>
+    <div class="card">
+      <div class="toolbar">
+        <div class="toolbar-left">
+          <select class="filter" id="fEstadoFactura">
+            <option value="">Todos los estados</option>
+            <option value="Pagada">Pagada</option>
+            <option value="Pendiente">Pendiente</option>
+            <option value="Vencida">Vencida</option>
+          </select>
+        </div>
+        <div style="font-size:12.5px;color:var(--text-dim);">${rows.length} facturas</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Cliente</th><th>Concepto</th><th>Producto</th><th>Emisión</th><th>Vencimiento</th><th>Monto</th><th>Estado</th><th></th></tr></thead>
+          <tbody>
+            ${rows.length ? rows.map(f=>`
+              <tr>
+                <td class="cell-strong">${escapeHtml(clienteNombre(f.clienteId))}</td>
+                <td class="cell-dim">${escapeHtml(f.concepto)}</td>
+                <td><span class="tag-product ${productTagClass(f.producto)}">${productLabel(f.producto)}</span></td>
+                <td class="cell-dim">${formatDate(f.fechaEmision)}</td>
+                <td class="cell-dim">${formatDate(f.fechaVenc)}</td>
+                <td class="cell-strong">${formatCOP(f.monto)}</td>
+                <td><span class="badge ${estadoBadge(f.estado)}"><span class="badge-dot"></span>${f.estado}</span></td>
+                <td>
+                  <div class="row-actions">
+                    <button class="icon-btn" data-edit="${f.id}">${ICONS.edit}</button>
+                    <button class="icon-btn danger" data-del="${f.id}">${ICONS.trash}</button>
+                  </div>
+                </td>
+              </tr>`).join('') : `<tr><td colspan="8"><div class="empty-state">${ICONS.empty}<div>No hay facturas con este filtro</div></div></td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+  document.getElementById('fEstadoFactura').value = facturaFiltro.estado;
+  document.getElementById('fEstadoFactura').addEventListener('change', e=>{facturaFiltro.estado=e.target.value; RENDER_FACTURAS();});
+  document.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click', ()=>openFacturaModal(b.dataset.edit)));
+  document.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click', ()=>{
+    confirmDialog('¿Eliminar esta factura?', ()=>{
+      STATE.facturas = STATE.facturas.filter(x=>x.id!==b.dataset.del);
+      saveState(); RENDER_FACTURAS(); toast('Factura eliminada');
+    });
+  }));
+}
+
+function openFacturaModal(id){
+  const editing = !!id;
+  const f = editing ? STATE.facturas.find(f=>f.id===id) : {clienteId:'', producto:'agendamiento', concepto:'', monto:0, fechaEmision:todayISO(), fechaVenc:addDays(15), estado:'Pendiente'};
+  const clienteOptions = STATE.clientes.map(c=>`<option value="${c.id}" ${f.clienteId===c.id?'selected':''}>${escapeHtml(c.nombre)}</option>`).join('');
+  openModal(editing?'Editar factura':'Nueva factura', `
+    <div class="form-group"><label>Cliente</label><select id="f_cliente"><option value="">Selecciona...</option>${clienteOptions}</select></div>
+    <div class="form-group"><label>Concepto</label><input id="f_concepto" value="${escapeHtml(f.concepto)}" placeholder="Ej: Suscripción mensual - Profesional"></div>
+    <div class="form-row">
+      <div class="form-group"><label>Producto</label>
+        <select id="f_producto">
+          <option value="agendamiento" ${f.producto==='agendamiento'?'selected':''}>Agendamiento de citas</option>
+          <option value="excel-bi" ${f.producto==='excel-bi'?'selected':''}>Clases Excel & Power BI</option>
+          <option value="ambos" ${f.producto==='ambos'?'selected':''}>Ambos productos</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Monto (COP)</label><input id="f_monto" type="number" min="0" step="1000" value="${f.monto||0}"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Fecha de emisión</label><input id="f_emision" type="date" value="${f.fechaEmision}"></div>
+      <div class="form-group"><label>Fecha de vencimiento</label><input id="f_venc" type="date" value="${f.fechaVenc}"></div>
+    </div>
+    <div class="form-group"><label>Estado</label>
+      <select id="f_estado">
+        <option value="Pendiente" ${f.estado==='Pendiente'?'selected':''}>Pendiente</option>
+        <option value="Pagada" ${f.estado==='Pagada'?'selected':''}>Pagada</option>
+        <option value="Vencida" ${f.estado==='Vencida'?'selected':''}>Vencida</option>
+      </select>
+    </div>
+  `, `
+    <button class="btn btn-outline" id="cancelBtn">Cancelar</button>
+    <button class="btn btn-primary" id="saveBtn">${ICONS.check} Guardar</button>
+  `);
+  document.getElementById('cancelBtn').onclick = closeModal;
+  document.getElementById('saveBtn').onclick = ()=>{
+    const clienteId = document.getElementById('f_cliente').value;
+    if(!clienteId){ toast('Selecciona un cliente'); return; }
+    const data = {
+      clienteId,
+      producto: document.getElementById('f_producto').value,
+      concepto: document.getElementById('f_concepto').value.trim() || 'Servicio',
+      monto: Number(document.getElementById('f_monto').value)||0,
+      fechaEmision: document.getElementById('f_emision').value || todayISO(),
+      fechaVenc: document.getElementById('f_venc').value || todayISO(),
+      estado: document.getElementById('f_estado').value,
+    };
+    if(editing){ Object.assign(f, data); } else { STATE.facturas.push({id:uid(), ...data}); }
+    saveState(); closeModal(); RENDER_FACTURAS(); toast(editing?'Factura actualizada':'Factura creada');
+    if(CURRENT_VIEW==='dashboard') RENDER_DASHBOARD();
+  };
+}
+
+/* =========================================================
+   AGENDA
+========================================================= */
+function RENDER_AGENDA(){
+  const rows = [...STATE.agenda].sort((a,b)=> (a.fecha+a.hora).localeCompare(b.fecha+b.hora));
+  document.getElementById('view').innerHTML = `
+    <div class="card">
+      <div class="toolbar">
+        <div style="font-size:13px;font-weight:700;">Próximas clases, demos y citas</div>
+        <div style="font-size:12.5px;color:var(--text-dim);">${rows.length} eventos</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Fecha</th><th>Hora</th><th>Tipo</th><th>Cliente</th><th>Modalidad</th><th>Estado</th><th></th></tr></thead>
+          <tbody>
+            ${rows.length ? rows.map(a=>`
+              <tr>
+                <td class="cell-strong">${formatDate(a.fecha)}</td>
+                <td class="cell-dim">${a.hora}</td>
+                <td>${escapeHtml(a.tipo)}</td>
+                <td>${escapeHtml(clienteNombre(a.clienteId))}</td>
+                <td class="cell-dim">${a.modalidad}</td>
+                <td><span class="badge ${estadoBadge(a.estado)}"><span class="badge-dot"></span>${a.estado}</span></td>
+                <td>
+                  <div class="row-actions">
+                    <button class="icon-btn" data-edit="${a.id}">${ICONS.edit}</button>
+                    <button class="icon-btn danger" data-del="${a.id}">${ICONS.trash}</button>
+                  </div>
+                </td>
+              </tr>`).join('') : `<tr><td colspan="7"><div class="empty-state">${ICONS.empty}<div>No hay eventos programados</div></div></td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+  document.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click', ()=>openAgendaModal(b.dataset.edit)));
+  document.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click', ()=>{
+    confirmDialog('¿Eliminar este evento de la agenda?', ()=>{
+      STATE.agenda = STATE.agenda.filter(x=>x.id!==b.dataset.del);
+      saveState(); RENDER_AGENDA(); toast('Evento eliminado');
+    });
+  }));
+}
+
+function openAgendaModal(id){
+  const editing = !!id;
+  const a = editing ? STATE.agenda.find(a=>a.id===id) : {clienteId:'', tipo:'Clase Excel', fecha:todayISO(), hora:'10:00', duracion:'45 min', modalidad:'Virtual', estado:'Programada', notas:''};
+  const clienteOptions = STATE.clientes.map(c=>`<option value="${c.id}" ${a.clienteId===c.id?'selected':''}>${escapeHtml(c.nombre)}</option>`).join('');
+  openModal(editing?'Editar evento':'Nuevo evento de agenda', `
+    <div class="form-group"><label>Cliente</label><select id="f_cliente"><option value="">Selecciona...</option>${clienteOptions}</select></div>
+    <div class="form-row">
+      <div class="form-group"><label>Tipo de evento</label>
+        <select id="f_tipo">
+          ${['Clase Excel','Clase Power BI','Demo Agendamiento','Soporte','Reunión'].map(t=>`<option value="${t}" ${a.tipo===t?'selected':''}>${t}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group"><label>Modalidad</label>
+        <select id="f_modalidad">
+          <option value="Virtual" ${a.modalidad==='Virtual'?'selected':''}>Virtual</option>
+          <option value="Presencial" ${a.modalidad==='Presencial'?'selected':''}>Presencial</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Fecha</label><input id="f_fecha" type="date" value="${a.fecha}"></div>
+      <div class="form-group"><label>Hora</label><input id="f_hora" type="time" value="${a.hora}"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Duración</label><input id="f_duracion" value="${escapeHtml(a.duracion)}" placeholder="Ej: 45 min"></div>
+      <div class="form-group"><label>Estado</label>
+        <select id="f_estado">
+          <option value="Programada" ${a.estado==='Programada'?'selected':''}>Programada</option>
+          <option value="Completada" ${a.estado==='Completada'?'selected':''}>Completada</option>
+          <option value="Cancelada" ${a.estado==='Cancelada'?'selected':''}>Cancelada</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-group"><label>Notas</label><textarea id="f_notas">${escapeHtml(a.notas||'')}</textarea></div>
+  `, `
+    <button class="btn btn-outline" id="cancelBtn">Cancelar</button>
+    <button class="btn btn-primary" id="saveBtn">${ICONS.check} Guardar</button>
+  `);
+  document.getElementById('cancelBtn').onclick = closeModal;
+  document.getElementById('saveBtn').onclick = ()=>{
+    const clienteId = document.getElementById('f_cliente').value;
+    if(!clienteId){ toast('Selecciona un cliente'); return; }
+    const data = {
+      clienteId,
+      tipo: document.getElementById('f_tipo').value,
+      modalidad: document.getElementById('f_modalidad').value,
+      fecha: document.getElementById('f_fecha').value || todayISO(),
+      hora: document.getElementById('f_hora').value || '09:00',
+      duracion: document.getElementById('f_duracion').value.trim() || '45 min',
+      estado: document.getElementById('f_estado').value,
+      notas: document.getElementById('f_notas').value.trim(),
+    };
+    if(editing){ Object.assign(a, data); } else { STATE.agenda.push({id:uid(), ...data}); }
+    saveState(); closeModal(); RENDER_AGENDA(); toast(editing?'Evento actualizado':'Evento creado');
+    if(CURRENT_VIEW==='dashboard') RENDER_DASHBOARD();
+  };
+}
+
+/* =========================================================
+   REPORTES
+========================================================= */
+function RENDER_REPORTES(){
+  // ingresos por mes (ultimos 6 meses) según facturas pagadas
+  const months = [];
+  const now = new Date();
+  for(let i=5;i>=0;i--){
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    months.push({key:`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`, label:d.toLocaleDateString('es-CO',{month:'short'})});
+  }
+  const ingresosPorMes = months.map(m=>{
+    const total = STATE.facturas.filter(f=>f.estado==='Pagada' && f.fechaEmision.startsWith(m.key)).reduce((s,f)=>s+Number(f.monto||0),0);
+    return {...m, total};
+  });
+  const maxIngreso = Math.max(1, ...ingresosPorMes.map(m=>m.total));
+
+  // clientes por producto
+  const productKeys = [
+    {key:'agendamiento', label:'Agendamiento', color:'#5b5ff2'},
+    {key:'excel-bi', label:'Excel & Power BI', color:'#17c3b2'},
+    {key:'ambos', label:'Ambos', color:'#ff9f5b'},
+  ];
+  const totalClientes = STATE.clientes.length || 1;
+  let accP=0;
+  const gradientProd = productKeys.map(p=>{
+    const count = STATE.clientes.filter(c=>c.producto===p.key).length;
+    const pct = (count/totalClientes)*100;
+    const str = `${p.color} ${accP}% ${accP+pct}%`;
+    accP += pct;
+    return str;
+  }).join(', ');
+
+  // clientes por sector (solo agendamiento)
+  const sectores = {};
+  STATE.clientes.filter(c=>c.producto==='agendamiento'||c.producto==='ambos').forEach(c=>{
+    sectores[c.sector] = (sectores[c.sector]||0)+1;
+  });
+  const sectorEntries = Object.entries(sectores).sort((a,b)=>b[1]-a[1]);
+  const maxSector = Math.max(1, ...sectorEntries.map(s=>s[1]));
+
+  // tasa de conversion pipeline
+  const ganados = STATE.ventas.filter(v=>v.etapa==='Ganado').length;
+  const perdidos = STATE.ventas.filter(v=>v.etapa==='Perdido').length;
+  const cerrados = ganados+perdidos;
+  const winRate = cerrados ? Math.round((ganados/cerrados)*100) : 0;
+
+  document.getElementById('view').innerHTML = `
+    <div class="grid grid-2" style="margin-bottom:18px;">
+      <div class="card">
+        <div class="card-title">Ingresos cobrados (últimos 6 meses)</div>
+        <div class="bars">
+          ${ingresosPorMes.map(m=>`
+            <div class="bar-row">
+              <div style="text-transform:capitalize;">${m.label}</div>
+              <div class="bar-track"><div class="bar-fill" style="width:${(m.total/maxIngreso)*100}%"></div></div>
+              <div class="bar-val">${formatCOP(m.total)}</div>
+            </div>`).join('')}
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Clientes por producto</div>
+        <div class="donut-wrap">
+          <div class="donut" style="background:conic-gradient(${gradientProd || '#eee 0 100%'});"></div>
+          <div class="donut-legend">
+            ${productKeys.map(p=>`
+              <div class="legend-item">
+                <span class="legend-dot" style="background:${p.color}"></span>
+                <span>${p.label}</span>
+                <span class="legend-val">${STATE.clientes.filter(c=>c.producto===p.key).length}</span>
+              </div>`).join('')}
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="grid grid-2">
+      <div class="card">
+        <div class="card-title">Clientes de agendamiento por sector</div>
+        <div class="bars">
+          ${sectorEntries.length ? sectorEntries.map(([s,c])=>`
+            <div class="bar-row">
+              <div>${escapeHtml(s)}</div>
+              <div class="bar-track"><div class="bar-fill" style="width:${(c/maxSector)*100}%"></div></div>
+              <div class="bar-val">${c}</div>
+            </div>`).join('') : `<div class="empty-state">${ICONS.empty}<div>Sin datos aún</div></div>`}
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-title">Efectividad comercial</div>
+        <div class="grid grid-3" style="gap:12px;">
+          <div class="card kpi" style="box-shadow:none;">
+            <div class="label">Ganadas</div><div class="value" style="color:var(--ok)">${ganados}</div>
+          </div>
+          <div class="card kpi" style="box-shadow:none;">
+            <div class="label">Perdidas</div><div class="value" style="color:var(--danger)">${perdidos}</div>
+          </div>
+          <div class="card kpi" style="box-shadow:none;">
+            <div class="label">Win rate</div><div class="value">${winRate}%</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+/* =========================================================
+   CONFIGURACIÓN
+========================================================= */
+function RENDER_CONFIG(){
+  document.getElementById('view').innerHTML = `
+    <div class="card" style="max-width:520px;">
+      <div class="card-title">Datos de la empresa</div>
+      <div class="form-group"><label>Nombre de la empresa</label><input id="f_empresa" value="${escapeHtml(STATE.config.empresa)}"></div>
+      <button class="btn btn-primary" id="saveConfig">${ICONS.check} Guardar cambios</button>
+    </div>
+    <div class="card" style="max-width:520px;margin-top:18px;">
+      <div class="card-title">Datos locales</div>
+      <p style="font-size:12.5px;color:var(--text-dim);line-height:1.6;">
+        Toda la información de este panel (clientes, ventas, facturas y agenda) se guarda únicamente en el
+        almacenamiento local de este navegador. No se envía a ningún servidor.
+      </p>
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-outline" id="exportBtn">Exportar datos (.json)</button>
+        <button class="btn btn-danger" id="resetBtn">${ICONS.trash} Restablecer datos de ejemplo</button>
+      </div>
+    </div>
+  `;
+  document.getElementById('saveConfig').onclick = ()=>{
+    STATE.config.empresa = document.getElementById('f_empresa').value.trim() || 'Taseca Software';
+    document.getElementById('companyNameLabel').textContent = STATE.config.empresa;
+    saveState(); toast('Configuración guardada');
+  };
+  document.getElementById('exportBtn').onclick = ()=>{
+    const blob = new Blob([JSON.stringify(STATE, null, 2)], {type:'application/json'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'taseca_admin_datos.json'; a.click();
+    URL.revokeObjectURL(url);
+  };
+  document.getElementById('resetBtn').onclick = ()=>{
+    confirmDialog('Esto reemplazará todos los datos actuales por los datos de ejemplo iniciales. ¿Continuar?', ()=>{
+      STATE = seedData();
+      saveState();
+      document.getElementById('companyNameLabel').textContent = STATE.config.empresa;
+      goTo('dashboard');
+      toast('Datos restablecidos');
+    });
+  };
+}
+
+/* =========================================================
+   BÚSQUEDA GLOBAL
+========================================================= */
+document.getElementById('globalSearch').addEventListener('input', (e)=>{
+  const q = e.target.value.trim();
+  if(!q) return;
+  if(CURRENT_VIEW!=='clientes') goTo('clientes');
+  clienteFiltro.q = q;
+  RENDER_CLIENTES();
+  document.getElementById('globalSearch').focus();
+  document.getElementById('globalSearch').value = q;
+});
+
+/* =========================================================
+   INIT
+========================================================= */
+const RENDERERS = {
+  dashboard: RENDER_DASHBOARD,
+  clientes: RENDER_CLIENTES,
+  ventas: RENDER_VENTAS,
+  cotizaciones: RENDER_COTIZACIONES,
+  productos: RENDER_PRODUCTOS,
+  facturas: RENDER_FACTURAS,
+  agenda: RENDER_AGENDA,
+  reportes: RENDER_REPORTES,
+  config: RENDER_CONFIG,
+};
+
+document.getElementById('companyNameLabel').textContent = STATE.config.empresa;
+renderNav();
+renderQuickAdd();
+RENDER_DASHBOARD();
+</script>
+</body>
+</html>
