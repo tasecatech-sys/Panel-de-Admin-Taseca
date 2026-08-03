@@ -482,6 +482,7 @@ const ICONS = {
   arrowLeft:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>',
   copy:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>',
   printer:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>',
+  plan:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5-10-5Z"/><path d="M6 12v5c0 1 3 3 6 3s6-2 6-3v-5"/></svg>',
 };
 
 /* =========================================================
@@ -609,7 +610,9 @@ function seedData(){
 // Traduce entre los nombres de campo usados en el código (camelCase)
 // y las columnas reales de cada tabla en Postgres (snake_case).
 const TABLE_MAPS = {
-  clientes: { nombre:'nombre', sector:'sector', ciudad:'ciudad', producto:'producto', plan:'plan', email:'email', telefono:'telefono', estado:'estado', valorMensual:'valor_mensual', fechaRegistro:'fecha_registro', notas:'notas' },
+  clientes: { nombre:'nombre', sector:'sector', ciudad:'ciudad', producto:'producto', plan:'plan', email:'email', telefono:'telefono', estado:'estado', valorMensual:'valor_mensual', fechaRegistro:'fecha_registro', notas:'notas', documento:'documento' },
+  clases_catalogo: { mes:'mes', plataforma:'plataforma', titulo:'titulo', contenido:'contenido' },
+  progreso: { clienteId:'cliente_id', claseId:'clase_id', completed:'completed', completedBy:'completed_by', completedAt:'completed_at' },
   ventas: { clienteId:'cliente_id', nombreLead:'nombre_lead', producto:'producto', plan:'plan', valor:'valor', etapa:'etapa', fecha:'fecha' },
   facturas: { clienteId:'cliente_id', producto:'producto', concepto:'concepto', monto:'monto', fechaEmision:'fecha_emision', fechaVenc:'fecha_venc', estado:'estado' },
   agenda: { clienteId:'cliente_id', tipo:'tipo', fecha:'fecha', hora:'hora', duracion:'duracion', modalidad:'modalidad', estado:'estado', notas:'notas' },
@@ -690,12 +693,18 @@ async function resetAllTables(){
   await seedTablesIfEmpty();
 }
 
+async function dbFetchAllSafe(table){
+  try{ return await dbFetchAll(table); }
+  catch(e){ console.warn('Tabla "'+table+'" no disponible todavía (¿corriste el script SQL?)', e); return []; }
+}
+
 async function fetchAllFromTables(){
-  const [clientes, ventas, facturas, agenda, cotizaciones, configRow] = await Promise.all([
+  const [clientes, ventas, facturas, agenda, cotizaciones, configRow, clasesCatalogo, progreso] = await Promise.all([
     dbFetchAll('clientes'), dbFetchAll('ventas'), dbFetchAll('facturas'), dbFetchAll('agenda'), dbFetchAll('cotizaciones'), loadConfigRow(),
+    dbFetchAllSafe('clases_catalogo'), dbFetchAllSafe('progreso'),
   ]);
   return {
-    clientes, ventas, facturas, agenda, cotizaciones,
+    clientes, ventas, facturas, agenda, cotizaciones, clasesCatalogo, progreso,
     productos: seedData().productos,
     cotizacionSeq: configRow ? (configRow.cotizacion_seq || 1) : 1,
     config: configRow ? configRowToObj(configRow) : { empresa:'Taseca Software', moneda:'COP', consultorNombre:'Equipo Comercial', consultorCargo:'Consultor de Soluciones', consultorContacto:'contacto@taseca.tech' },
@@ -782,6 +791,7 @@ const NAV = [
   {id:'ventas', label:'Ventas / Pipeline', icon:'ventas', sub:'Oportunidades comerciales'},
   {id:'cotizaciones', label:'Cotizaciones', icon:'cotizaciones', sub:'Genera propuestas y cotizaciones'},
   {id:'productos', label:'Productos', icon:'productos', sub:'Catálogo y planes'},
+  {id:'plan-estudio', label:'Plan de Estudio', icon:'plan', sub:'Catálogo de clases y avance de estudiantes'},
   {id:'facturas', label:'Facturación', icon:'facturas', sub:'Cobros e ingresos'},
   {id:'agenda', label:'Agenda', icon:'agenda', sub:'Clases, demos y citas'},
   {id:'reportes', label:'Reportes', icon:'reportes', sub:'Indicadores del negocio'},
@@ -817,6 +827,7 @@ function renderQuickAdd(){
     ventas:{label:'Nueva oportunidad', action:()=>openVentaModal()},
     cotizaciones: cotizacionView==='list' ? {label:'Nueva cotización', action:()=>openCotizacionEditor(null)} : null,
     productos:null,
+    'plan-estudio': planEstudioTab==='catalogo' ? {label:'Nueva clase', action:()=>openClaseModal()} : null,
     facturas:{label:'Nueva factura', action:()=>openFacturaModal()},
     agenda:{label:'Nuevo evento', action:()=>openAgendaModal()},
     reportes:null,
@@ -1083,6 +1094,7 @@ function openClienteModal(id){
       <div class="form-group"><label>Email</label><input id="f_email" value="${escapeHtml(c.email||'')}" placeholder="correo@ejemplo.com"></div>
       <div class="form-group"><label>Teléfono</label><input id="f_telefono" value="${escapeHtml(c.telefono||'')}" placeholder="300 000 0000"></div>
     </div>
+    <div class="form-group"><label>Documento / Cédula (solo si toma clases Excel/Power BI)</label><input id="f_documento" value="${escapeHtml(c.documento||'')}" placeholder="Ej: 1000000000"></div>
     <div class="form-row">
       <div class="form-group"><label>Estado</label>
         <select id="f_estado">
@@ -1110,6 +1122,7 @@ function openClienteModal(id){
       plan: document.getElementById('f_plan').value.trim(),
       email: document.getElementById('f_email').value.trim(),
       telefono: document.getElementById('f_telefono').value.trim(),
+      documento: document.getElementById('f_documento').value.trim() || null,
       estado: document.getElementById('f_estado').value,
       valorMensual: Number(document.getElementById('f_valor').value)||0,
       notas: document.getElementById('f_notas').value.trim(),
@@ -1783,6 +1796,221 @@ function RENDER_PRODUCTOS(){
 }
 
 /* =========================================================
+   PLAN DE ESTUDIO (catálogo + progreso Excel/Power BI)
+========================================================= */
+let planEstudioTab = 'progreso'; // 'progreso' | 'catalogo'
+let planEstudioClienteId = '';
+let planEstudioPlatFilter = '';
+
+function clientePlataformas(cliente){
+  return (cliente.producto==='excel-bi' || cliente.producto==='ambos') ? ['excel','powerbi'] : [];
+}
+const PLAT_LABEL_ESTUDIO = { excel:'Excel', powerbi:'Power BI' };
+
+async function setProgresoRow(clienteId, claseId, completed){
+  const payload = {
+    cliente_id: clienteId, clase_id: claseId, completed,
+    completed_by: completed ? (CURRENT_USER_EMAIL||'') : null,
+    completed_at: completed ? new Date().toISOString() : null,
+  };
+  const { data, error } = await sb.from('progreso').upsert(payload, {onConflict:'cliente_id,clase_id'}).select().single();
+  if(error){ console.error(error); toast('Error actualizando progreso'); throw error; }
+  const obj = fromRow('progreso', data);
+  const idx = STATE.progreso.findIndex(p=>p.clienteId===clienteId && p.claseId===claseId);
+  if(idx>-1) STATE.progreso[idx] = obj; else STATE.progreso.push(obj);
+  return obj;
+}
+
+function RENDER_PLAN_ESTUDIO(){
+  const tablesReady = Array.isArray(STATE.clasesCatalogo);
+  document.getElementById('view').innerHTML = `
+    <div class="pill-tabs" style="margin-bottom:18px;">
+      <button class="pill-tab ${planEstudioTab==='progreso'?'active':''}" id="tabProgreso">Progreso de estudiantes</button>
+      <button class="pill-tab ${planEstudioTab==='catalogo'?'active':''}" id="tabCatalogo">Catálogo de clases</button>
+    </div>
+    <div id="planEstudioBody"></div>
+  `;
+  document.getElementById('tabProgreso').onclick = ()=>{ planEstudioTab='progreso'; goTo('plan-estudio'); };
+  document.getElementById('tabCatalogo').onclick = ()=>{ planEstudioTab='catalogo'; goTo('plan-estudio'); };
+
+  if(!tablesReady || !STATE.clasesCatalogo.length){
+    document.getElementById('planEstudioBody').innerHTML = `
+      <div class="card"><div class="empty-state">${ICONS.empty}
+        <div>Aún no hay catálogo de clases. Corre <b>supabase_plan_estudio.sql</b> en tu proyecto de Supabase para crear las tablas y la currícula base.</div>
+      </div></div>`;
+    return;
+  }
+
+  if(planEstudioTab==='catalogo') renderPlanCatalogo();
+  else renderPlanProgreso();
+}
+
+function renderPlanProgreso(){
+  const estudiantes = STATE.clientes.filter(c=>clientePlataformas(c).length).sort((a,b)=>a.nombre.localeCompare(b.nombre));
+  const cliente = STATE.clientes.find(c=>c.id===planEstudioClienteId);
+  const plats = cliente ? clientePlataformas(cliente) : [];
+
+  let resumenHtml = '';
+  let listadoHtml = `<div class="empty-state">${ICONS.empty}<div>Elige un estudiante para ver y marcar su avance.</div></div>`;
+
+  if(cliente){
+    const cat = STATE.clasesCatalogo.filter(c=>plats.includes(c.plataforma));
+    const progMap = {};
+    STATE.progreso.filter(p=>p.clienteId===cliente.id).forEach(p=>{ progMap[p.claseId] = p; });
+
+    const total = cat.length;
+    const vistas = cat.filter(c=>progMap[c.id] && progMap[c.id].completed).length;
+    const pct = total ? Math.round(vistas/total*100) : 0;
+
+    resumenHtml = `
+      <div class="grid grid-3" style="margin-bottom:18px;">
+        <div class="card kpi"><div class="label">Avance general</div><div class="value">${pct}%</div></div>
+        <div class="card kpi"><div class="label">Clases vistas</div><div class="value" style="color:var(--ok)">${vistas}</div></div>
+        <div class="card kpi"><div class="label">Clases restantes</div><div class="value">${total-vistas}</div></div>
+      </div>`;
+
+    const shown = cat.filter(c=> !planEstudioPlatFilter || c.plataforma===planEstudioPlatFilter);
+    let curMes = null;
+    listadoHtml = shown.length ? shown.map(c=>{
+      const p = progMap[c.id];
+      const completed = !!(p && p.completed);
+      let mesHeader = '';
+      if(c.mes !== curMes){ curMes = c.mes; mesHeader = `<div class="qe-section-title" style="margin-top:16px;"><span class="num">${c.mes}</span>Mes ${c.mes}</div>`; }
+      return `${mesHeader}
+        <div class="qe-line" style="grid-template-columns:1fr auto;">
+          <div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span class="cell-dim" style="font-family:monospace;">#${c.id}</span>
+              <span class="tag-product ${c.plataforma==='excel'?'tag-excel':'tag-agenda'}">${PLAT_LABEL_ESTUDIO[c.plataforma]}</span>
+              <span class="cell-strong">${escapeHtml(c.titulo)}</span>
+            </div>
+            <div class="cell-dim" style="margin-top:4px;">${escapeHtml(c.contenido||'')}</div>
+            ${completed && p.completedBy ? `<div style="font-size:11px;color:var(--ok);margin-top:4px;">✓ Completada por ${escapeHtml(p.completedBy)}</div>` : ''}
+          </div>
+          <button class="btn ${completed?'btn-primary':'btn-outline'} btn-sm" data-toggle-clase="${c.id}" data-completed="${completed}" style="align-self:center;">
+            ${completed ? ICONS.check+' Vista' : 'Marcar'}
+          </button>
+        </div>`;
+    }).join('') : `<div class="empty-state">${ICONS.empty}<div>Sin clases para este filtro.</div></div>`;
+  }
+
+  document.getElementById('planEstudioBody').innerHTML = `
+    <div class="card" style="margin-bottom:18px;">
+      <div class="toolbar">
+        <div class="toolbar-left">
+          <select class="filter" id="peEstudiante" style="min-width:240px;">
+            <option value="">— Selecciona un estudiante —</option>
+            ${estudiantes.map(e=>`<option value="${e.id}" ${planEstudioClienteId===e.id?'selected':''}>${escapeHtml(e.nombre)}</option>`).join('')}
+          </select>
+          <select class="filter" id="peFiltroPlat">
+            <option value="">Todas las plataformas</option>
+            <option value="excel" ${planEstudioPlatFilter==='excel'?'selected':''}>Excel</option>
+            <option value="powerbi" ${planEstudioPlatFilter==='powerbi'?'selected':''}>Power BI</option>
+          </select>
+        </div>
+        ${!estudiantes.length ? '<span class="cell-dim">Ningún cliente tiene el producto "Excel & Power BI" o "Ambos" todavía.</span>' : ''}
+      </div>
+    </div>
+    ${resumenHtml}
+    <div class="card">${listadoHtml}</div>
+  `;
+
+  document.getElementById('peEstudiante').addEventListener('change', e=>{ planEstudioClienteId = e.target.value; renderPlanProgreso(); });
+  document.getElementById('peFiltroPlat').addEventListener('change', e=>{ planEstudioPlatFilter = e.target.value; renderPlanProgreso(); });
+  document.querySelectorAll('[data-toggle-clase]').forEach(btn=>btn.addEventListener('click', async ()=>{
+    const claseId = Number(btn.dataset.toggleClase);
+    const wasCompleted = btn.dataset.completed === 'true';
+    await setProgresoRow(cliente.id, claseId, !wasCompleted);
+    renderPlanProgreso();
+  }));
+}
+
+function renderPlanCatalogo(){
+  const cat = [...STATE.clasesCatalogo].sort((a,b)=> a.mes-b.mes || a.plataforma.localeCompare(b.plataforma) || a.id-b.id);
+  document.getElementById('planEstudioBody').innerHTML = `
+    <div class="card">
+      <div class="toolbar"><div style="font-size:13px;font-weight:700;">Currícula (${cat.length} clases)</div></div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>ID</th><th>Mes</th><th>Plataforma</th><th>Título</th><th>Contenido</th><th></th></tr></thead>
+          <tbody>
+            ${cat.length ? cat.map(c=>`
+              <tr>
+                <td class="cell-dim" style="font-family:monospace;">${c.id}</td>
+                <td class="cell-dim">${c.mes}</td>
+                <td><span class="tag-product ${c.plataforma==='excel'?'tag-excel':'tag-agenda'}">${PLAT_LABEL_ESTUDIO[c.plataforma]}</span></td>
+                <td class="cell-strong">${escapeHtml(c.titulo)}</td>
+                <td class="cell-dim">${escapeHtml(c.contenido||'')}</td>
+                <td>
+                  <div class="row-actions">
+                    <button class="icon-btn" data-edit-clase="${c.id}">${ICONS.edit}</button>
+                    <button class="icon-btn danger" data-del-clase="${c.id}">${ICONS.trash}</button>
+                  </div>
+                </td>
+              </tr>`).join('') : `<tr><td colspan="6"><div class="empty-state">${ICONS.empty}<div>Sin clases en el catálogo</div></div></td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+  document.querySelectorAll('[data-edit-clase]').forEach(b=>b.addEventListener('click', ()=>openClaseModal(Number(b.dataset.editClase))));
+  document.querySelectorAll('[data-del-clase]').forEach(b=>b.addEventListener('click', ()=>{
+    const id = Number(b.dataset.delClase);
+    const c = STATE.clasesCatalogo.find(x=>x.id===id);
+    confirmDialog(`¿Eliminar la clase <b>${escapeHtml(c.titulo)}</b>? También se borra el progreso de estudiantes registrado para ella.`, async ()=>{
+      await dbDelete('clases_catalogo', id);
+      STATE.clasesCatalogo = STATE.clasesCatalogo.filter(x=>x.id!==id);
+      STATE.progreso = STATE.progreso.filter(p=>p.claseId!==id);
+      renderPlanCatalogo(); toast('Clase eliminada');
+    });
+  }));
+}
+
+function openClaseModal(id){
+  const editing = !!id;
+  const c = editing ? STATE.clasesCatalogo.find(c=>c.id===id) : {id:'', mes:1, plataforma:'excel', titulo:'', contenido:''};
+  openModal(editing?'Editar clase':'Nueva clase', `
+    <div class="form-row">
+      <div class="form-group"><label>ID</label><input id="cl_id" type="number" value="${c.id}" ${editing?'disabled':''} placeholder="Ej: 131"></div>
+      <div class="form-group"><label>Mes</label><input id="cl_mes" type="number" min="1" value="${c.mes}"></div>
+    </div>
+    <div class="form-group"><label>Plataforma</label>
+      <select id="cl_plataforma">
+        <option value="excel" ${c.plataforma==='excel'?'selected':''}>Excel</option>
+        <option value="powerbi" ${c.plataforma==='powerbi'?'selected':''}>Power BI</option>
+      </select>
+    </div>
+    <div class="form-group"><label>Título</label><input id="cl_titulo" value="${escapeHtml(c.titulo)}" placeholder="Ej: Tablas dinámicas avanzadas"></div>
+    <div class="form-group"><label>Contenido / temario</label><textarea id="cl_contenido" placeholder="Describe el temario de esta clase...">${escapeHtml(c.contenido||'')}</textarea></div>
+    <div class="form-hint">Convención sugerida: mismo tema en Excel y Power BI, ID consecutivo (ej: 131 Excel, 132 Power BI).</div>
+  `, `
+    <button class="btn btn-outline" id="cancelBtn">Cancelar</button>
+    <button class="btn btn-primary" id="saveBtn">${ICONS.check} Guardar</button>
+  `);
+  document.getElementById('cancelBtn').onclick = closeModal;
+  document.getElementById('saveBtn').onclick = async ()=>{
+    const data = {
+      mes: Number(document.getElementById('cl_mes').value)||1,
+      plataforma: document.getElementById('cl_plataforma').value,
+      titulo: document.getElementById('cl_titulo').value.trim(),
+      contenido: document.getElementById('cl_contenido').value.trim(),
+    };
+    if(!data.titulo){ toast('El título es obligatorio'); return; }
+    if(editing){
+      await dbUpdate('clases_catalogo', c.id, data);
+      Object.assign(c, data);
+    } else {
+      const newId = Number(document.getElementById('cl_id').value);
+      if(!newId){ toast('El ID es obligatorio'); return; }
+      if(STATE.clasesCatalogo.some(x=>x.id===newId)){ toast('Ya existe una clase con ese ID'); return; }
+      const created = await dbInsert('clases_catalogo', {id:newId, ...data});
+      STATE.clasesCatalogo.push(created);
+    }
+    closeModal(); renderPlanCatalogo(); toast(editing?'Clase actualizada':'Clase creada');
+  };
+}
+
+/* =========================================================
    FACTURACIÓN
 ========================================================= */
 let facturaFiltro = {estado:''};
@@ -2149,7 +2377,7 @@ function RENDER_CONFIG(){
     URL.revokeObjectURL(url);
   };
   document.getElementById('resetBtn').onclick = ()=>{
-    confirmDialog('Esto reemplazará TODOS los datos actuales (de toda la empresa, no solo tu navegador) por los datos de ejemplo iniciales. ¿Continuar?', async ()=>{
+    confirmDialog('Esto reemplazará TODOS los datos actuales (de toda la empresa, no solo tu navegador) por los datos de ejemplo iniciales, incluyendo el progreso del Plan de Estudio de tus estudiantes actuales. ¿Continuar?', async ()=>{
       await resetAllTables();
       STATE = await loadState();
       document.getElementById('companyNameLabel').textContent = STATE.config.empresa;
@@ -2181,6 +2409,7 @@ const RENDERERS = {
   ventas: RENDER_VENTAS,
   cotizaciones: RENDER_COTIZACIONES,
   productos: RENDER_PRODUCTOS,
+  'plan-estudio': RENDER_PLAN_ESTUDIO,
   facturas: RENDER_FACTURAS,
   agenda: RENDER_AGENDA,
   reportes: RENDER_REPORTES,
@@ -2211,8 +2440,10 @@ function setAuthError(msg){
 }
 
 let appInitialized = false;
+let CURRENT_USER_EMAIL = '';
 async function initApp(session){
-  document.getElementById('sessionEmailLabel').textContent = session.user.email || '';
+  CURRENT_USER_EMAIL = session.user.email || '';
+  document.getElementById('sessionEmailLabel').textContent = CURRENT_USER_EMAIL;
   showAuthLoading(true);
   try{
     STATE = await loadState();
