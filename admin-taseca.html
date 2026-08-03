@@ -373,6 +373,11 @@ select.filter, input.filter{
   display:flex;align-items:center;justify-content:center;z-index:500;padding:20px;
 }
 #authScreen.hidden{display:none;}
+#noRoleScreen{
+  position:fixed;inset:0;background:linear-gradient(160deg,var(--sidebar),var(--sidebar-2));
+  display:flex;align-items:center;justify-content:center;z-index:500;padding:20px;
+}
+#noRoleScreen.hidden{display:none;}
 .auth-card{
   background:#fff;border-radius:16px;padding:34px 32px;width:100%;max-width:380px;
   box-shadow:0 20px 60px rgba(0,0,0,.35);
@@ -411,6 +416,17 @@ select.filter, input.filter{
     <p style="font-size:11.5px;color:var(--text-dim);margin-top:16px;text-align:center;">
       ¿Olvidaste tu contraseña? <a href="#" id="authForgot" style="color:var(--accent);">Recuperarla</a>
     </p>
+  </div>
+</div>
+
+<div id="noRoleScreen" class="hidden">
+  <div class="auth-card" style="text-align:center;">
+    <div class="auth-brand" style="justify-content:center;">
+      <div class="brand-mark" id="brandMarkNoRole"></div>
+    </div>
+    <h2 class="auth-title">Sin acceso asignado</h2>
+    <p class="auth-sub">Tu cuenta (<span id="noRoleEmail" style="color:var(--text);font-weight:600;"></span>) no tiene un rol activo en este panel. Pide a un administrador que te agregue desde Configuración → Gestión de usuarios.</p>
+    <button class="btn btn-outline" style="width:100%;justify-content:center;" id="noRoleLogout">Cerrar sesión</button>
   </div>
 </div>
 
@@ -799,9 +815,19 @@ const NAV = [
   {id:'config', label:'Configuración', icon:'config', sub:'Preferencias del panel'},
 ];
 
+const ROLE_NAV = {
+  admin: ['dashboard','clientes','ventas','cotizaciones','productos','plan-estudio','facturas','agenda','reportes','config'],
+  profesor: ['dashboard','clientes','plan-estudio','agenda','productos'],
+  contador: ['dashboard','clientes','ventas','cotizaciones','facturas','reportes','productos'],
+};
+function allowedViews(){
+  return ROLE_NAV[CURRENT_USER_ROLE] || ROLE_NAV.admin;
+}
+
 function renderNav(){
   const el = document.getElementById('navlinks');
-  el.innerHTML = NAV.map(n=>`
+  const allowed = allowedViews();
+  el.innerHTML = NAV.filter(n=>allowed.includes(n.id)).map(n=>`
     <button class="navitem ${n.id===CURRENT_VIEW?'active':''}" data-nav="${n.id}">
       ${ICONS[n.icon]}<span>${n.label}</span>
     </button>`).join('');
@@ -811,6 +837,7 @@ function renderNav(){
 }
 
 function goTo(view){
+  if(!allowedViews().includes(view)) view = 'dashboard';
   CURRENT_VIEW = view;
   const meta = NAV.find(n=>n.id===view);
   document.getElementById('viewTitle').textContent = meta.label;
@@ -2515,7 +2542,34 @@ function RENDER_CONFIG(){
         "Restablecer" sobrescribe los datos para <b>todo el equipo</b> (afecta la base de datos compartida), no solo tu navegador.
       </p>
     </div>
+    ${CURRENT_USER_ROLE==='admin' ? `
+    <div class="card" style="max-width:720px;margin-top:18px;">
+      <div class="card-title">Gestión de usuarios</div>
+      <div id="staffList"><p class="cell-dim">Cargando...</p></div>
+      <div style="border-top:1px solid var(--border);margin:20px 0 16px;"></div>
+      <div class="qe-section-title" style="margin-bottom:14px;">Crear nuevo usuario</div>
+      <div class="form-row">
+        <div class="form-group"><label>Nombre</label><input id="st_nombre" placeholder="Nombre completo"></div>
+        <div class="form-group"><label>Correo</label><input id="st_email" type="email" placeholder="correo@taseca.tech"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Contraseña temporal</label><input id="st_password" type="text" placeholder="Mínimo 8 caracteres"></div>
+        <div class="form-group"><label>Rol</label>
+          <select id="st_rol">
+            <option value="profesor">Profesor</option>
+            <option value="contador">Contador</option>
+            <option value="admin">Administrador</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="st_crear">Crear usuario</button>
+      <p class="form-hint" id="st_msg"></p>
+      <p style="font-size:11px;color:var(--text-dim);margin-top:10px;">
+        Requiere haber desplegado la función <code>create-staff-user</code> con la CLI de Supabase (<code>supabase functions deploy create-staff-user</code>).
+      </p>
+    </div>` : ''}
   `;
+  if(CURRENT_USER_ROLE==='admin'){ renderStaffList(); wireStaffCreateForm(); }
   document.getElementById('saveConfig').onclick = async ()=>{
     const empresa = document.getElementById('f_empresa').value.trim() || 'Taseca Software';
     await updateConfigRow({ empresa });
@@ -2538,6 +2592,98 @@ function RENDER_CONFIG(){
       goTo('dashboard');
       toast('Datos restablecidos');
     });
+  };
+}
+
+const STAFF_ROL_LABEL = { admin:'Administrador', profesor:'Profesor', contador:'Contador' };
+
+async function renderStaffList(){
+  const box = document.getElementById('staffList');
+  if(!box) return;
+  const { data, error } = await sb.from('staff_usuarios').select('*').order('nombre');
+  if(error){
+    box.innerHTML = `<div class="empty-state">${ICONS.empty}<div>Falta correr <b>supabase_roles.sql</b> en Supabase para activar la gestión de usuarios.</div></div>`;
+    return;
+  }
+  if(!data.length){ box.innerHTML = '<p class="cell-dim" style="font-size:13px;">Aún no hay usuarios registrados.</p>'; return; }
+
+  box.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th><th></th></tr></thead>
+    <tbody>${data.map(u=>{
+      const isSelf = u.email === CURRENT_USER_EMAIL.toLowerCase();
+      return `
+      <tr>
+        <td class="cell-strong">${escapeHtml(u.nombre||'')}${isSelf?' <span class="cell-dim">(tú)</span>':''}</td>
+        <td class="cell-dim">${escapeHtml(u.email)}</td>
+        <td>
+          <select class="filter" data-rol-user="${escapeHtml(u.email)}" style="font-size:12px;" ${isSelf?'disabled':''}>
+            ${Object.keys(STAFF_ROL_LABEL).map(r=>`<option value="${r}" ${u.rol===r?'selected':''}>${STAFF_ROL_LABEL[r]}</option>`).join('')}
+          </select>
+        </td>
+        <td>
+          <select class="estado-select ${u.activo?'badge-green':'badge-gray'}" data-activo-user="${escapeHtml(u.email)}" ${isSelf?'disabled':''}>
+            <option value="true" ${u.activo?'selected':''}>Activo</option>
+            <option value="false" ${!u.activo?'selected':''}>Inactivo</option>
+          </select>
+        </td>
+        <td>${isSelf?'' : `<button class="icon-btn danger" data-del-user="${escapeHtml(u.email)}">${ICONS.trash}</button>`}</td>
+      </tr>`;
+    }).join('')}</tbody></table></div>`;
+
+  box.querySelectorAll('[data-rol-user]').forEach(sel=>sel.addEventListener('change', async e=>{
+    await sb.from('staff_usuarios').update({rol:e.target.value}).eq('email', sel.dataset.rolUser);
+    toast('Rol actualizado'); renderStaffList();
+  }));
+  box.querySelectorAll('[data-activo-user]').forEach(sel=>sel.addEventListener('change', async e=>{
+    await sb.from('staff_usuarios').update({activo: e.target.value==='true'}).eq('email', sel.dataset.activoUser);
+    toast('Estado actualizado'); renderStaffList();
+  }));
+  box.querySelectorAll('[data-del-user]').forEach(b=>b.addEventListener('click', ()=>{
+    confirmDialog(`¿Quitar a <b>${escapeHtml(b.dataset.delUser)}</b> del panel? Esto <b>no borra</b> su cuenta de acceso en Supabase, solo le quita el rol (perderá acceso al panel).`, async ()=>{
+      await sb.from('staff_usuarios').delete().eq('email', b.dataset.delUser);
+      renderStaffList(); toast('Usuario removido');
+    });
+  }));
+}
+
+function wireStaffCreateForm(){
+  document.getElementById('st_crear').onclick = async ()=>{
+    const nombre = document.getElementById('st_nombre').value.trim();
+    const email = document.getElementById('st_email').value.trim().toLowerCase();
+    const password = document.getElementById('st_password').value;
+    const rol = document.getElementById('st_rol').value;
+    const msg = document.getElementById('st_msg');
+    msg.style.color = 'var(--danger)';
+
+    if(!email || !password){ msg.textContent = 'Correo y contraseña son obligatorios.'; return; }
+    if(password.length < 8){ msg.textContent = 'La contraseña debe tener al menos 8 caracteres.'; return; }
+
+    const btn = document.getElementById('st_crear');
+    btn.disabled = true; btn.textContent = 'Creando...'; msg.textContent = '';
+
+    const { data: { session } } = await sb.auth.getSession();
+    try{
+      const res = await fetch(SUPABASE_URL + '/functions/v1/create-staff-user', {
+        method:'POST',
+        headers:{ 'Content-Type':'application/json', 'Authorization':'Bearer '+session.access_token },
+        body: JSON.stringify({ nombre, email, password, rol }),
+      });
+      const body = await res.json();
+      btn.disabled = false; btn.textContent = 'Crear usuario';
+      if(!res.ok || body.error){
+        msg.textContent = body.error || 'No se pudo crear el usuario.';
+        return;
+      }
+      msg.style.color = 'var(--ok)';
+      msg.textContent = 'Usuario creado correctamente.';
+      document.getElementById('st_nombre').value='';
+      document.getElementById('st_email').value='';
+      document.getElementById('st_password').value='';
+      renderStaffList();
+    }catch(e){
+      btn.disabled = false; btn.textContent = 'Crear usuario';
+      msg.textContent = 'No se pudo conectar con la función de creación de usuarios. ¿Ya desplegaste "create-staff-user" en Supabase?';
+    }
   };
 }
 
@@ -2578,12 +2724,22 @@ function showAuthLoading(show){
 }
 function showLogin(){
   document.getElementById('authScreen').classList.remove('hidden');
+  document.getElementById('noRoleScreen').classList.add('hidden');
   document.getElementById('appShell').classList.add('hidden');
   showAuthLoading(false);
 }
 function showApp(){
   document.getElementById('authScreen').classList.add('hidden');
+  document.getElementById('noRoleScreen').classList.add('hidden');
   document.getElementById('appShell').classList.remove('hidden');
+  showAuthLoading(false);
+}
+function showNoRole(){
+  document.getElementById('authScreen').classList.add('hidden');
+  document.getElementById('appShell').classList.add('hidden');
+  document.getElementById('noRoleEmail').textContent = CURRENT_USER_EMAIL;
+  document.getElementById('brandMarkNoRole').innerHTML = TASECA_LOGO_SVG;
+  document.getElementById('noRoleScreen').classList.remove('hidden');
   showAuthLoading(false);
 }
 function setAuthError(msg){
@@ -2595,10 +2751,40 @@ function setAuthError(msg){
 
 let appInitialized = false;
 let CURRENT_USER_EMAIL = '';
+let CURRENT_USER_ROLE = 'admin';
+
+// Determina el rol del usuario logueado. Si la tabla de roles aún no
+// existe (no has corrido supabase_roles.sql), permite todo como antes.
+// Si la tabla existe pero está vacía, el primer usuario que entra queda
+// registrado como admin automáticamente.
+async function getCurrentStaffRole(){
+  const email = CURRENT_USER_EMAIL.toLowerCase();
+  const { data, error } = await sb.from('staff_usuarios').select('*').eq('email', email).maybeSingle();
+  if(error){
+    console.warn('staff_usuarios no disponible todavía (¿corriste supabase_roles.sql?)', error);
+    return 'admin';
+  }
+  if(data) return data.activo ? data.rol : null;
+
+  const { count, error: countErr } = await sb.from('staff_usuarios').select('*', {count:'exact', head:true});
+  if(!countErr && !count){
+    const { error: insErr } = await sb.from('staff_usuarios').insert({ email, nombre: CURRENT_USER_EMAIL, rol:'admin', activo:true });
+    if(!insErr) return 'admin';
+  }
+  return null;
+}
+
 async function initApp(session){
   CURRENT_USER_EMAIL = session.user.email || '';
   document.getElementById('sessionEmailLabel').textContent = CURRENT_USER_EMAIL;
   showAuthLoading(true);
+
+  CURRENT_USER_ROLE = await getCurrentStaffRole();
+  if(!CURRENT_USER_ROLE){
+    showNoRole();
+    return;
+  }
+
   try{
     STATE = await loadState();
   }catch(e){
@@ -2642,6 +2828,9 @@ document.getElementById('authForgot').addEventListener('click', async (e)=>{
 });
 
 document.getElementById('logoutBtn').addEventListener('click', async ()=>{
+  await sb.auth.signOut();
+});
+document.getElementById('noRoleLogout').addEventListener('click', async ()=>{
   await sb.auth.signOut();
 });
 
