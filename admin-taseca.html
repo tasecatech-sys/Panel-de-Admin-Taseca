@@ -613,6 +613,7 @@ const TABLE_MAPS = {
   clientes: { nombre:'nombre', sector:'sector', ciudad:'ciudad', producto:'producto', plan:'plan', email:'email', telefono:'telefono', estado:'estado', valorMensual:'valor_mensual', fechaRegistro:'fecha_registro', notas:'notas', documento:'documento' },
   clases_catalogo: { mes:'mes', plataforma:'plataforma', titulo:'titulo', contenido:'contenido' },
   progreso: { clienteId:'cliente_id', claseId:'clase_id', completed:'completed', completedBy:'completed_by', completedAt:'completed_at' },
+  horarios: { fecha:'fecha', hora:'hora', plataforma:'plataforma', profesor:'profesor', duracion:'duracion', modalidad:'modalidad', estado:'estado', clienteId:'cliente_id' },
   ventas: { clienteId:'cliente_id', nombreLead:'nombre_lead', producto:'producto', plan:'plan', valor:'valor', etapa:'etapa', fecha:'fecha' },
   facturas: { clienteId:'cliente_id', producto:'producto', concepto:'concepto', monto:'monto', fechaEmision:'fecha_emision', fechaVenc:'fecha_venc', estado:'estado' },
   agenda: { clienteId:'cliente_id', tipo:'tipo', fecha:'fecha', hora:'hora', duracion:'duracion', modalidad:'modalidad', estado:'estado', notas:'notas' },
@@ -699,12 +700,12 @@ async function dbFetchAllSafe(table){
 }
 
 async function fetchAllFromTables(){
-  const [clientes, ventas, facturas, agenda, cotizaciones, configRow, clasesCatalogo, progreso] = await Promise.all([
+  const [clientes, ventas, facturas, agenda, cotizaciones, configRow, clasesCatalogo, progreso, horarios] = await Promise.all([
     dbFetchAll('clientes'), dbFetchAll('ventas'), dbFetchAll('facturas'), dbFetchAll('agenda'), dbFetchAll('cotizaciones'), loadConfigRow(),
-    dbFetchAllSafe('clases_catalogo'), dbFetchAllSafe('progreso'),
+    dbFetchAllSafe('clases_catalogo'), dbFetchAllSafe('progreso'), dbFetchAllSafe('horarios'),
   ]);
   return {
-    clientes, ventas, facturas, agenda, cotizaciones, clasesCatalogo, progreso,
+    clientes, ventas, facturas, agenda, cotizaciones, clasesCatalogo, progreso, horarios,
     productos: seedData().productos,
     cotizacionSeq: configRow ? (configRow.cotizacion_seq || 1) : 1,
     config: configRow ? configRowToObj(configRow) : { empresa:'Taseca Software', moneda:'COP', consultorNombre:'Equipo Comercial', consultorCargo:'Consultor de Soluciones', consultorContacto:'contacto@taseca.tech' },
@@ -1826,11 +1827,13 @@ function RENDER_PLAN_ESTUDIO(){
   document.getElementById('view').innerHTML = `
     <div class="pill-tabs" style="margin-bottom:18px;">
       <button class="pill-tab ${planEstudioTab==='progreso'?'active':''}" id="tabProgreso">Progreso de estudiantes</button>
+      <button class="pill-tab ${planEstudioTab==='horarios'?'active':''}" id="tabHorarios">Horarios</button>
       <button class="pill-tab ${planEstudioTab==='catalogo'?'active':''}" id="tabCatalogo">Catálogo de clases</button>
     </div>
     <div id="planEstudioBody"></div>
   `;
   document.getElementById('tabProgreso').onclick = ()=>{ planEstudioTab='progreso'; goTo('plan-estudio'); };
+  document.getElementById('tabHorarios').onclick = ()=>{ planEstudioTab='horarios'; goTo('plan-estudio'); };
   document.getElementById('tabCatalogo').onclick = ()=>{ planEstudioTab='catalogo'; goTo('plan-estudio'); };
 
   if(!tablesReady || !STATE.clasesCatalogo.length){
@@ -1842,6 +1845,7 @@ function RENDER_PLAN_ESTUDIO(){
   }
 
   if(planEstudioTab==='catalogo') renderPlanCatalogo();
+  else if(planEstudioTab==='horarios') renderPlanHorarios();
   else renderPlanProgreso();
 }
 
@@ -2008,6 +2012,156 @@ function openClaseModal(id){
     }
     closeModal(); renderPlanCatalogo(); toast(editing?'Clase actualizada':'Clase creada');
   };
+}
+
+/* ---------------------------------------------------------------
+   HORARIOS (franjas fijas para agendar clases)
+--------------------------------------------------------------- */
+let horariosFechasNuevas = [];
+
+function renderPlanHorarios(){
+  const horariosReady = Array.isArray(STATE.horarios);
+  if(!horariosReady){
+    document.getElementById('planEstudioBody').innerHTML = `
+      <div class="card"><div class="empty-state">${ICONS.empty}
+        <div>Falta correr <b>supabase_horarios.sql</b> en tu proyecto de Supabase para activar esta sección.</div>
+      </div></div>`;
+    return;
+  }
+
+  const franjas = [...STATE.horarios].sort((a,b)=> (a.fecha+a.hora).localeCompare(b.fecha+b.hora));
+
+  document.getElementById('planEstudioBody').innerHTML = `
+    <div class="grid grid-2">
+      <div class="card">
+        <div class="qe-section-title"><span class="num">1</span>Habilitar horarios</div>
+        <div class="form-row">
+          <div class="form-group"><label>Desde</label><input id="ho_desde" type="time" value="16:00"></div>
+          <div class="form-group"><label>Hasta</label><input id="ho_hasta" type="time" value="18:00"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Duración (min)</label>
+            <select id="ho_duracion">
+              <option value="30">30</option><option value="45">45</option>
+              <option value="60" selected>60</option><option value="90">90</option><option value="120">120</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Plataforma</label>
+            <select id="ho_plataforma">
+              <option value="excel">Excel</option>
+              <option value="powerbi">Power BI</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Modalidad</label>
+            <select id="ho_modalidad">
+              <option value="Virtual">Virtual</option>
+              <option value="Presencial">Presencial</option>
+            </select>
+          </div>
+          <div class="form-group"><label>Profesor (a nombre de quién)</label><input id="ho_profesor" value="${escapeHtml(CURRENT_USER_EMAIL)}"></div>
+        </div>
+        <div class="form-group">
+          <label>Fechas (agrega una o varias)</label>
+          <div style="display:flex;gap:8px;">
+            <input id="ho_fecha" type="date" style="flex:1;">
+            <button class="btn btn-outline btn-sm" id="ho_addFecha" type="button">${ICONS.plus} Añadir</button>
+          </div>
+          <div id="ho_fechasList" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;"></div>
+        </div>
+        <button class="btn btn-primary" id="ho_generar">Generar franjas</button>
+        <p id="ho_msg" class="form-hint"></p>
+      </div>
+
+      <div class="card">
+        <div class="qe-section-title"><span class="num">2</span>Franjas creadas <small style="margin-left:auto;">${franjas.length}</small></div>
+        <div class="table-wrap" style="max-height:480px;overflow-y:auto;">
+          <table>
+            <thead><tr><th>Fecha</th><th>Hora</th><th>Plataforma</th><th>Estado</th><th></th></tr></thead>
+            <tbody>
+              ${franjas.length ? franjas.map(f=>`
+                <tr>
+                  <td class="cell-strong">${formatDate(f.fecha)}</td>
+                  <td class="cell-dim">${f.hora}</td>
+                  <td><span class="tag-product ${f.plataforma==='excel'?'tag-excel':'tag-agenda'}">${PLAT_LABEL_ESTUDIO[f.plataforma]}</span></td>
+                  <td>${f.estado==='libre'
+                      ? `<span class="badge badge-blue"><span class="badge-dot"></span>Libre</span>`
+                      : `<span class="badge badge-green"><span class="badge-dot"></span>${escapeHtml(clienteNombre(f.clienteId))}</span>`}</td>
+                  <td>${f.estado==='libre' ? `<button class="icon-btn danger" data-del-franja="${f.id}">${ICONS.trash}</button>` : ''}</td>
+                </tr>`).join('') : `<tr><td colspan="5"><div class="empty-state">${ICONS.empty}<div>Aún no has creado horarios</div></div></td></tr>`}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  `;
+
+  horariosFechasNuevas = [];
+  renderFechasList();
+  document.getElementById('ho_addFecha').onclick = ()=>{
+    const v = document.getElementById('ho_fecha').value;
+    if(v && !horariosFechasNuevas.includes(v)){ horariosFechasNuevas.push(v); renderFechasList(); }
+  };
+  document.getElementById('ho_generar').onclick = generarFranjasUI;
+  document.querySelectorAll('[data-del-franja]').forEach(b=>b.addEventListener('click', ()=>{
+    confirmDialog('¿Eliminar esta franja libre?', async ()=>{
+      await dbDelete('horarios', b.dataset.delFranja);
+      STATE.horarios = STATE.horarios.filter(x=>x.id!==b.dataset.delFranja);
+      renderPlanHorarios(); toast('Franja eliminada');
+    });
+  }));
+}
+
+function renderFechasList(){
+  const box = document.getElementById('ho_fechasList');
+  if(!box) return;
+  box.innerHTML = horariosFechasNuevas.map(f=>`
+    <span class="segmento-chip" style="display:flex;align-items:center;gap:6px;">${formatDate(f)}
+      <span data-quitar-fecha="${f}" style="cursor:pointer;color:var(--danger);font-weight:800;">&times;</span>
+    </span>`).join('') || '<span class="cell-dim" style="font-size:12px;">Sin fechas agregadas todavía.</span>';
+  box.querySelectorAll('[data-quitar-fecha]').forEach(el=>el.addEventListener('click', ()=>{
+    horariosFechasNuevas = horariosFechasNuevas.filter(f=>f!==el.dataset.quitarFecha);
+    renderFechasList();
+  }));
+}
+
+async function generarFranjasUI(){
+  const msg = document.getElementById('ho_msg');
+  if(!horariosFechasNuevas.length){ msg.textContent = 'Agrega al menos una fecha.'; return; }
+  const desde = document.getElementById('ho_desde').value;
+  const hasta = document.getElementById('ho_hasta').value;
+  const dur = Number(document.getElementById('ho_duracion').value);
+  const plataforma = document.getElementById('ho_plataforma').value;
+  const modalidad = document.getElementById('ho_modalidad').value;
+  const profesor = document.getElementById('ho_profesor').value.trim() || CURRENT_USER_EMAIL;
+
+  const [dh,dm] = desde.split(':').map(Number);
+  const [hh,hm] = hasta.split(':').map(Number);
+  const ini = dh*60+(dm||0), fin = hh*60+(hm||0);
+  if(!(fin > ini)){ msg.textContent = 'La hora final debe ser mayor a la inicial.'; return; }
+
+  const existentes = STATE.horarios;
+  const nuevas = [];
+  horariosFechasNuevas.forEach(f=>{
+    for(let t=ini; t+dur<=fin; t+=dur){
+      const hh2 = Math.floor(t/60), mm2 = t%60;
+      const horaStr = String(hh2).padStart(2,'0')+':'+String(mm2).padStart(2,'0');
+      const dup = existentes.some(r=>r.fecha===f && r.hora===horaStr && r.plataforma===plataforma)
+        || nuevas.some(r=>r.fecha===f && r.hora===horaStr);
+      if(!dup) nuevas.push({fecha:f, hora:horaStr, plataforma, profesor, duracion:dur, modalidad, estado:'libre'});
+    }
+  });
+
+  if(!nuevas.length){ msg.textContent = 'No se generó ninguna franja nueva (¿ya existían?).'; return; }
+
+  msg.textContent = 'Creando franjas...';
+  for(const n of nuevas){
+    const created = await dbInsert('horarios', n);
+    STATE.horarios.push(created);
+  }
+  toast(`${nuevas.length} franja(s) creada(s)`);
+  renderPlanHorarios();
 }
 
 /* =========================================================
