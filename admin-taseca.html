@@ -366,37 +366,87 @@ select.filter, input.filter{
   .qp-print-area{position:absolute;top:0;left:0;width:100%;margin:0;padding:0;}
   .qp-outer{border-radius:0;padding:0;background:#050508;}
 }
+
+/* ---------- pantalla de login ---------- */
+#authScreen{
+  position:fixed;inset:0;background:linear-gradient(160deg,var(--sidebar),var(--sidebar-2));
+  display:flex;align-items:center;justify-content:center;z-index:500;padding:20px;
+}
+#authScreen.hidden{display:none;}
+.auth-card{
+  background:#fff;border-radius:16px;padding:34px 32px;width:100%;max-width:380px;
+  box-shadow:0 20px 60px rgba(0,0,0,.35);
+}
+.auth-brand{display:flex;align-items:center;gap:10px;margin-bottom:22px;}
+.auth-title{font-size:18px;font-weight:700;margin:0 0 4px;}
+.auth-sub{font-size:12.5px;color:var(--text-dim);margin:0 0 22px;}
+.auth-error{background:#fdecee;color:var(--danger);font-size:12.5px;padding:9px 12px;border-radius:9px;margin-bottom:14px;display:none;}
+.auth-error.show{display:block;}
+.auth-loading{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:400;font-size:13px;color:var(--text-dim);}
+.auth-loading.hidden{display:none;}
+#appShell.hidden{display:none;}
 </style>
 </head>
 <body>
 
-<aside id="sidebar">
-  <div class="brand">
-    <div class="brand-mark">T</div>
-    <div>
-      <div class="brand-name" id="companyNameLabel">Taseca Software</div>
-      <div class="brand-sub">Panel de administración</div>
-    </div>
-  </div>
-  <nav class="navlinks" id="navlinks"></nav>
-  <div class="sidebar-foot">v1.0 · Datos guardados en este navegador</div>
-</aside>
+<div class="auth-loading" id="authLoading">Cargando…</div>
 
-<div id="main">
-  <div id="topbar">
-    <div>
-      <h1 id="viewTitle">Dashboard</h1>
-      <div class="sub" id="viewSub">Resumen general del negocio</div>
-    </div>
-    <div class="top-actions">
-      <div class="search-box">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-        <input type="text" id="globalSearch" placeholder="Buscar clientes...">
+<div id="authScreen" class="hidden">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <div class="brand-mark">T</div>
+      <div>
+        <div class="brand-name">Taseca Software</div>
+        <div class="brand-sub" style="color:var(--text-dim);">Panel de administración</div>
       </div>
-      <button class="btn btn-primary" id="quickAddBtn"></button>
     </div>
+    <h2 class="auth-title">Iniciar sesión</h2>
+    <p class="auth-sub">Ingresa con tu cuenta de Taseca para acceder al panel.</p>
+    <div class="auth-error" id="authError"></div>
+    <form id="authForm">
+      <div class="form-group"><label>Correo</label><input type="email" id="authEmail" required placeholder="tucorreo@taseca.tech"></div>
+      <div class="form-group"><label>Contraseña</label><input type="password" id="authPassword" required placeholder="••••••••"></div>
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;" id="authSubmit">Ingresar</button>
+    </form>
+    <p style="font-size:11.5px;color:var(--text-dim);margin-top:16px;text-align:center;">
+      ¿Olvidaste tu contraseña? <a href="#" id="authForgot" style="color:var(--accent);">Recuperarla</a>
+    </p>
   </div>
-  <div id="view"></div>
+</div>
+
+<div id="appShell" class="hidden" style="display:flex;width:100%;">
+  <aside id="sidebar">
+    <div class="brand">
+      <div class="brand-mark">T</div>
+      <div>
+        <div class="brand-name" id="companyNameLabel">Taseca Software</div>
+        <div class="brand-sub">Panel de administración</div>
+      </div>
+    </div>
+    <nav class="navlinks" id="navlinks"></nav>
+    <div class="sidebar-foot">
+      <div id="sessionEmailLabel" style="color:#c3c8e6;font-weight:600;margin-bottom:8px;word-break:break-all;"></div>
+      <button class="btn btn-outline btn-sm" id="logoutBtn" style="width:100%;justify-content:center;">Cerrar sesión</button>
+      <div style="margin-top:10px;">v1.1 · Datos sincronizados con Supabase</div>
+    </div>
+  </aside>
+
+  <div id="main">
+    <div id="topbar">
+      <div>
+        <h1 id="viewTitle">Dashboard</h1>
+        <div class="sub" id="viewSub">Resumen general del negocio</div>
+      </div>
+      <div class="top-actions">
+        <div class="search-box">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+          <input type="text" id="globalSearch" placeholder="Buscar clientes...">
+        </div>
+        <button class="btn btn-primary" id="quickAddBtn"></button>
+      </div>
+    </div>
+    <div id="view"></div>
+  </div>
 </div>
 
 <div class="overlay" id="overlay">
@@ -405,6 +455,7 @@ select.filter, input.filter{
 
 <div class="toast" id="toast"></div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 /* =========================================================
    ICONOS SVG
@@ -434,9 +485,20 @@ const ICONS = {
 };
 
 /* =========================================================
+   CONEXIÓN A SUPABASE
+========================================================= */
+// Reemplaza estos dos valores por los de tu proyecto en supabase.com
+// (Project Settings > API > Project URL / anon public key). El "anon key"
+// es seguro de exponer en el navegador: el acceso real lo controlan las
+// políticas de Row Level Security definidas en la base de datos.
+const SUPABASE_URL = 'https://TU-PROYECTO.supabase.co';
+const SUPABASE_ANON_KEY = 'TU-ANON-KEY-PUBLICA';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const APP_STATE_ROW_ID = 1;
+
+/* =========================================================
    DATOS / ESTADO
 ========================================================= */
-const STORAGE_KEY = 'taseca_admin_data_v1';
 const uid = () => Math.random().toString(36).slice(2,9);
 const todayISO = () => new Date().toISOString().slice(0,10);
 const addDays = (n) => { const d=new Date(); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); };
@@ -536,12 +598,14 @@ function seedData(){
   };
 }
 
-function loadState(){
-  let data;
-  try{
-    const raw = localStorage.getItem(STORAGE_KEY);
-    data = raw ? JSON.parse(raw) : null;
-  }catch(e){ console.warn('No se pudo leer almacenamiento local', e); }
+async function loadState(){
+  const { data: row, error } = await sb.from('app_state').select('data').eq('id', APP_STATE_ROW_ID).maybeSingle();
+  if(error){
+    console.error('Error cargando datos de Supabase', error);
+    throw error;
+  }
+
+  let data = row && row.data && Object.keys(row.data).length ? row.data : null;
   let changed = false;
   if(!data){
     data = seedData();
@@ -555,12 +619,26 @@ function loadState(){
     data.config.consultorContacto = 'contacto@taseca.tech | +57 300 000 0000';
     changed = true;
   }
-  if(changed) localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+  if(changed){
+    await sb.from('app_state').upsert({ id: APP_STATE_ROW_ID, data, updated_at: new Date().toISOString() });
+  }
   return data;
 }
-function saveState(){ localStorage.setItem(STORAGE_KEY, JSON.stringify(STATE)); }
 
-let STATE = loadState();
+let saveDebounceTimer = null;
+function saveState(){
+  clearTimeout(saveDebounceTimer);
+  saveDebounceTimer = setTimeout(async ()=>{
+    const { error } = await sb.from('app_state')
+      .upsert({ id: APP_STATE_ROW_ID, data: STATE, updated_at: new Date().toISOString() });
+    if(error){
+      console.error('Error guardando en Supabase', error);
+      toast('No se pudo guardar en la nube, revisa tu conexión');
+    }
+  }, 350);
+}
+
+let STATE = null;
 let CURRENT_VIEW = 'dashboard';
 
 /* =========================================================
@@ -1948,15 +2026,18 @@ function RENDER_CONFIG(){
       <button class="btn btn-primary" id="saveConfig">${ICONS.check} Guardar cambios</button>
     </div>
     <div class="card" style="max-width:520px;margin-top:18px;">
-      <div class="card-title">Datos locales</div>
+      <div class="card-title">Datos en la nube (Supabase)</div>
       <p style="font-size:12.5px;color:var(--text-dim);line-height:1.6;">
-        Toda la información de este panel (clientes, ventas, facturas y agenda) se guarda únicamente en el
-        almacenamiento local de este navegador. No se envía a ningún servidor.
+        Toda la información de este panel (clientes, ventas, facturas, agenda y cotizaciones) se guarda en tu
+        proyecto de Supabase y es compartida por todo tu equipo con acceso al panel.
       </p>
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
         <button class="btn btn-outline" id="exportBtn">Exportar datos (.json)</button>
         <button class="btn btn-danger" id="resetBtn">${ICONS.trash} Restablecer datos de ejemplo</button>
       </div>
+      <p style="font-size:11px;color:var(--danger);margin-top:10px;">
+        "Restablecer" sobrescribe los datos para <b>todo el equipo</b> (afecta la base de datos compartida), no solo tu navegador.
+      </p>
     </div>
   `;
   document.getElementById('saveConfig').onclick = ()=>{
@@ -1972,7 +2053,7 @@ function RENDER_CONFIG(){
     URL.revokeObjectURL(url);
   };
   document.getElementById('resetBtn').onclick = ()=>{
-    confirmDialog('Esto reemplazará todos los datos actuales por los datos de ejemplo iniciales. ¿Continuar?', ()=>{
+    confirmDialog('Esto reemplazará TODOS los datos actuales (de toda la empresa, no solo tu navegador) por los datos de ejemplo iniciales. ¿Continuar?', ()=>{
       STATE = seedData();
       saveState();
       document.getElementById('companyNameLabel').textContent = STATE.config.empresa;
@@ -2010,10 +2091,92 @@ const RENDERERS = {
   config: RENDER_CONFIG,
 };
 
-document.getElementById('companyNameLabel').textContent = STATE.config.empresa;
-renderNav();
-renderQuickAdd();
-RENDER_DASHBOARD();
+/* =========================================================
+   AUTENTICACIÓN (Supabase Auth)
+========================================================= */
+function showAuthLoading(show){
+  document.getElementById('authLoading').classList.toggle('hidden', !show);
+}
+function showLogin(){
+  document.getElementById('authScreen').classList.remove('hidden');
+  document.getElementById('appShell').classList.add('hidden');
+  showAuthLoading(false);
+}
+function showApp(){
+  document.getElementById('authScreen').classList.add('hidden');
+  document.getElementById('appShell').classList.remove('hidden');
+  showAuthLoading(false);
+}
+function setAuthError(msg){
+  const el = document.getElementById('authError');
+  if(!msg){ el.classList.remove('show'); el.textContent=''; return; }
+  el.textContent = msg;
+  el.classList.add('show');
+}
+
+let appInitialized = false;
+async function initApp(session){
+  document.getElementById('sessionEmailLabel').textContent = session.user.email || '';
+  showAuthLoading(true);
+  try{
+    STATE = await loadState();
+  }catch(e){
+    showAuthLoading(false);
+    setAuthError('No se pudo conectar con la base de datos. Verifica SUPABASE_URL / SUPABASE_ANON_KEY en el código.');
+    await sb.auth.signOut();
+    return;
+  }
+  document.getElementById('companyNameLabel').textContent = STATE.config.empresa;
+  appInitialized = true;
+  showApp();
+  CURRENT_VIEW = 'dashboard';
+  renderNav();
+  renderQuickAdd();
+  RENDER_DASHBOARD();
+}
+
+document.getElementById('authForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  setAuthError('');
+  const email = document.getElementById('authEmail').value.trim();
+  const password = document.getElementById('authPassword').value;
+  const btn = document.getElementById('authSubmit');
+  btn.disabled = true; btn.textContent = 'Ingresando…';
+  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  btn.disabled = false; btn.textContent = 'Ingresar';
+  if(error){
+    setAuthError(error.message === 'Invalid login credentials' ? 'Correo o contraseña incorrectos.' : error.message);
+    return;
+  }
+  await initApp(data.session);
+});
+
+document.getElementById('authForgot').addEventListener('click', async (e)=>{
+  e.preventDefault();
+  const email = document.getElementById('authEmail').value.trim();
+  if(!email){ setAuthError('Escribe tu correo arriba y vuelve a hacer clic en "Recuperarla".'); return; }
+  const { error } = await sb.auth.resetPasswordForEmail(email);
+  setAuthError(error ? error.message : '');
+  if(!error) toast('Te enviamos un correo para restablecer tu contraseña');
+});
+
+document.getElementById('logoutBtn').addEventListener('click', async ()=>{
+  await sb.auth.signOut();
+});
+
+sb.auth.onAuthStateChange((event, session)=>{
+  if(event === 'SIGNED_OUT'){
+    appInitialized = false;
+    STATE = null;
+    showLogin();
+  }
+});
+
+(async function boot(){
+  const { data: { session } } = await sb.auth.getSession();
+  if(session){ await initApp(session); }
+  else { showLogin(); }
+})();
 </script>
 </body>
 </html>
