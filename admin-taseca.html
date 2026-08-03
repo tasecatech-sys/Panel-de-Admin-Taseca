@@ -57,11 +57,11 @@ button{font-family:inherit;}
   border-bottom:1px solid rgba(255,255,255,.08);
 }
 .brand-mark{
-  width:36px;height:36px;border-radius:10px;
-  background:linear-gradient(135deg,var(--accent),var(--accent-2));
+  width:42px;height:42px;
   display:flex;align-items:center;justify-content:center;
-  font-weight:800;font-size:16px;color:#fff;flex-shrink:0;
+  flex-shrink:0;
 }
+.brand-mark svg{width:100%;height:100%;}
 .brand-name{font-weight:700;font-size:15px;letter-spacing:.3px;}
 .brand-sub{font-size:11px;color:#9aa1c4;margin-top:1px;}
 
@@ -394,7 +394,7 @@ select.filter, input.filter{
 <div id="authScreen" class="hidden">
   <div class="auth-card">
     <div class="auth-brand">
-      <div class="brand-mark">T</div>
+      <div class="brand-mark" id="brandMarkAuth"></div>
       <div>
         <div class="brand-name">Taseca Software</div>
         <div class="brand-sub" style="color:var(--text-dim);">Panel de administración</div>
@@ -417,7 +417,7 @@ select.filter, input.filter{
 <div id="appShell" class="hidden" style="display:flex;width:100%;">
   <aside id="sidebar">
     <div class="brand">
-      <div class="brand-mark">T</div>
+      <div class="brand-mark" id="brandMarkSidebar"></div>
       <div>
         <div class="brand-name" id="companyNameLabel">Taseca Software</div>
         <div class="brand-sub">Panel de administración</div>
@@ -2267,6 +2267,9 @@ sb.auth.onAuthStateChange((event, session)=>{
     showLogin();
   }
 });
+
+document.getElementById('brandMarkAuth').innerHTML = TASECA_LOGO_SVG;
+document.getElementById('brandMarkSidebar').innerHTML = TASECA_LOGO_SVG;
 
 (async function boot(){
   const { data: { session } } = await sb.auth.getSession();

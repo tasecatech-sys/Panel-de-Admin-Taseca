@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agenda tu clase | Taseca</title>
+<style>
+:root{
+  --bg:#f4f6fb; --panel:#ffffff; --border:#e4e8f1; --text:#1c2333; --text-dim:#697086;
+  --sidebar:#12172b; --sidebar-2:#1b2140; --accent:#5b5ff2; --accent-2:#17c3b2;
+  --danger:#e0525f; --ok:#26b26a; --radius:16px;
+}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+  font-family:'Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif;
+  background:linear-gradient(160deg,var(--sidebar),var(--sidebar-2));
+  min-height:100vh;color:var(--text);
+  display:flex;align-items:center;justify-content:center;padding:24px;
+}
+.wrap{width:100%;max-width:640px;}
+.hero{color:#fff;text-align:center;margin-bottom:22px;}
+.logo{width:64px;height:64px;margin:0 auto 12px;}
+.hero h1{font-size:22px;margin:0 0 6px;font-weight:700;}
+.hero p{font-size:13.5px;color:#b9bedd;margin:0;max-width:440px;margin:0 auto;line-height:1.5;}
+.card{
+  background:var(--panel);border-radius:var(--radius);padding:28px 26px;
+  box-shadow:0 20px 60px rgba(0,0,0,.35);margin-top:22px;
+}
+.form-group{margin-bottom:16px;}
+.form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.form-group label{display:block;font-size:12.5px;font-weight:700;color:var(--text-dim);margin-bottom:6px;}
+.form-group input,.form-group select,.form-group textarea{
+  width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:9px;
+  font-size:13.5px;font-family:inherit;outline:none;background:#fff;color:var(--text);
+}
+.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--accent);}
+.form-group textarea{resize:vertical;min-height:70px;}
+.class-options{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.class-opt{
+  border:1.5px solid var(--border);border-radius:11px;padding:14px;cursor:pointer;text-align:center;
+  transition:border-color .15s,background .15s;
+}
+.class-opt.selected{border-color:var(--accent);background:#f1f1ff;}
+.class-opt .t{font-weight:700;font-size:13.5px;}
+.class-opt .s{font-size:11px;color:var(--text-dim);margin-top:3px;}
+.btn-submit{
+  width:100%;padding:13px;border:none;border-radius:10px;
+  background:linear-gradient(135deg,var(--accent),#7b7ffb);color:#fff;
+  font-size:14px;font-weight:700;cursor:pointer;margin-top:6px;
+}
+.btn-submit:disabled{opacity:.6;cursor:default;}
+.msg{padding:11px 14px;border-radius:9px;font-size:13px;margin-bottom:16px;display:none;}
+.msg.show{display:block;}
+.msg.error{background:#fdecee;color:var(--danger);}
+.msg.ok{background:#e4f8ee;color:#1f9f5c;}
+.success-card{text-align:center;padding:40px 26px;}
+.success-card .icon{width:56px;height:56px;background:#e4f8ee;color:var(--ok);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;}
+.success-card h2{margin:0 0 8px;font-size:19px;}
+.success-card p{color:var(--text-dim);font-size:13.5px;line-height:1.6;}
+.footer-note{text-align:center;color:#8890b8;font-size:11.5px;margin-top:18px;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <div class="logo" id="logoHero"></div>
+    <h1>Agenda tu clase personalizada</h1>
+    <p>Cuéntanos qué quieres automatizar en Excel o Power BI y te contactamos para confirmar el horario de tu clase 1 a 1.</p>
+  </div>
+
+  <div class="card" id="formCard">
+    <div class="msg" id="formMsg"></div>
+    <form id="claseForm">
+      <div class="form-group">
+        <label>¿Qué clase quieres?</label>
+        <div class="class-options">
+          <div class="class-opt" data-tipo="Clase Excel">
+            <div class="t">Excel</div>
+            <div class="s">Macros, tablas dinámicas, automatización</div>
+          </div>
+          <div class="class-opt" data-tipo="Clase Power BI">
+            <div class="t">Power BI</div>
+            <div class="s">Dashboards e informes automáticos</div>
+          </div>
+        </div>
+      </div>
+      <div class="form-group"><label>Nombre completo</label><input type="text" id="f_nombre" required placeholder="Tu nombre"></div>
+      <div class="form-row">
+        <div class="form-group"><label>Correo</label><input type="email" id="f_email" required placeholder="tucorreo@ejemplo.com"></div>
+        <div class="form-group"><label>Teléfono</label><input type="tel" id="f_telefono" placeholder="300 000 0000"></div>
+      </div>
+      <div class="form-row">
+        <div class="form-group"><label>Fecha preferida</label><input type="date" id="f_fecha" required></div>
+        <div class="form-group"><label>Hora preferida</label><input type="time" id="f_hora" required></div>
+      </div>
+      <div class="form-group">
+        <label>Modalidad</label>
+        <select id="f_modalidad">
+          <option value="Virtual">Virtual</option>
+          <option value="Presencial">Presencial</option>
+        </select>
+      </div>
+      <div class="form-group"><label>¿Qué te gustaría automatizar? (opcional)</label><textarea id="f_notas" placeholder="Ej: quiero automatizar el informe mensual de ventas..."></textarea></div>
+      <button type="submit" class="btn-submit" id="submitBtn">Solicitar clase</button>
+    </form>
+  </div>
+
+  <div class="footer-note">Taseca Software · The All-Seeing Eye Consulting Analytics</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script>
+const SUPABASE_URL = 'https://mzxyqkbhrcegiyqbbazp.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_71sDgXwdaGSomzG2U24vkw_1N4JWhF-';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const LOGO_SVG = `<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="60" cy="60" r="54" fill="none" stroke="rgba(0,255,255,0.25)" stroke-width="0.5" stroke-dasharray="2 4"/>
+  <circle cx="22" cy="28" r="1.5" fill="#FFD700"/><circle cx="95" cy="40" r="1.5" fill="#00FFFF"/><circle cx="45" cy="110" r="1.5" fill="#FFD700"/>
+  <polygon points="60,12 108,95 12,95" fill="none" stroke="#FFD700" stroke-width="3" stroke-linejoin="round"/>
+  <polygon points="60,20 100,90 20,90" fill="none" stroke="rgba(0,255,255,0.4)" stroke-width="1" stroke-dasharray="3 3"/>
+  <path d="M 35 52 Q 60 30 85 52 Q 60 74 35 52" fill="none" stroke="#FFD700" stroke-width="2.5"/>
+  <circle cx="60" cy="52" r="8" fill="none" stroke="#00FFFF" stroke-width="2.5"/><circle cx="60" cy="52" r="3" fill="#00FFFF"/>
+  <line x1="60" y1="28" x2="60" y2="38" stroke="#00FFFF" stroke-width="1.5"/>
+  <rect x="42" y="78" width="5" height="6" fill="#00FFFF"/><rect x="50" y="70" width="5" height="14" fill="#FFD700"/>
+  <rect x="58" y="74" width="5" height="10" fill="#FFD700"/><rect x="66" y="72" width="5" height="12" fill="#00FFFF"/>
+</svg>`;
+document.getElementById('logoHero').innerHTML = LOGO_SVG;
+
+let tipoClase = null;
+document.querySelectorAll('.class-opt').forEach(el=>{
+  el.addEventListener('click', ()=>{
+    document.querySelectorAll('.class-opt').forEach(o=>o.classList.remove('selected'));
+    el.classList.add('selected');
+    tipoClase = el.dataset.tipo;
+  });
+});
+
+function showMsg(text, type){
+  const el = document.getElementById('formMsg');
+  el.textContent = text;
+  el.className = 'msg show ' + type;
+}
+
+document.getElementById('claseForm').addEventListener('submit', async (e)=>{
+  e.preventDefault();
+  if(!tipoClase){ showMsg('Selecciona si quieres clase de Excel o Power BI.', 'error'); return; }
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true; btn.textContent = 'Enviando...';
+
+  const { error } = await sb.rpc('solicitar_clase', {
+    p_nombre: document.getElementById('f_nombre').value.trim(),
+    p_email: document.getElementById('f_email').value.trim(),
+    p_telefono: document.getElementById('f_telefono').value.trim(),
+    p_tipo_clase: tipoClase,
+    p_fecha: document.getElementById('f_fecha').value,
+    p_hora: document.getElementById('f_hora').value,
+    p_modalidad: document.getElementById('f_modalidad').value,
+    p_notas: document.getElementById('f_notas').value.trim(),
+  });
+
+  btn.disabled = false; btn.textContent = 'Solicitar clase';
+
+  if(error){
+    console.error(error);
+    showMsg('No pudimos enviar tu solicitud. Intenta de nuevo en unos minutos.', 'error');
+    return;
+  }
+
+  document.getElementById('formCard').innerHTML = `
+    <div class="success-card">
+      <div class="icon">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
+      </div>
+      <h2>¡Solicitud enviada!</h2>
+      <p>Gracias por tu interés. Nuestro equipo revisará el horario propuesto y te contactará por correo o WhatsApp para confirmar tu clase.</p>
+    </div>`;
+});
+</script>
+</body>
+</html>

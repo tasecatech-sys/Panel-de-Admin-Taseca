@@ -1,5 +1,6 @@
 {
   "rewrites": [
-    { "source": "/", "destination": "/admin-taseca.html" }
+    { "source": "/", "destination": "/admin-taseca.html" },
+    { "source": "/agendar", "destination": "/agendar-clase.html" }
   ]
 }
