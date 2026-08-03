@@ -18,25 +18,26 @@ body{
   min-height:100vh;color:var(--text);
   display:flex;align-items:center;justify-content:center;padding:24px;
 }
-.wrap{width:100%;max-width:640px;}
+.wrap{width:100%;max-width:680px;}
 .hero{color:#fff;text-align:center;margin-bottom:22px;}
 .logo{width:64px;height:64px;margin:0 auto 12px;}
 .hero h1{font-size:22px;margin:0 0 6px;font-weight:700;}
-.hero p{font-size:13.5px;color:#b9bedd;margin:0;max-width:440px;margin:0 auto;line-height:1.5;}
+.hero p{font-size:13.5px;color:#b9bedd;margin:0;max-width:460px;margin:0 auto;line-height:1.5;}
 .card{
   background:var(--panel);border-radius:var(--radius);padding:28px 26px;
   box-shadow:0 20px 60px rgba(0,0,0,.35);margin-top:22px;
 }
+.step-title{font-size:12.5px;font-weight:800;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em;margin:0 0 12px;}
 .form-group{margin-bottom:16px;}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
 .form-group label{display:block;font-size:12.5px;font-weight:700;color:var(--text-dim);margin-bottom:6px;}
-.form-group input,.form-group select,.form-group textarea{
+.form-group input,.form-group textarea{
   width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:9px;
   font-size:13.5px;font-family:inherit;outline:none;background:#fff;color:var(--text);
 }
-.form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:var(--accent);}
+.form-group input:focus,.form-group textarea:focus{border-color:var(--accent);}
 .form-group textarea{resize:vertical;min-height:70px;}
-.class-options{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.class-options{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:22px;}
 .class-opt{
   border:1.5px solid var(--border);border-radius:11px;padding:14px;cursor:pointer;text-align:center;
   transition:border-color .15s,background .15s;
@@ -44,6 +45,15 @@ body{
 .class-opt.selected{border-color:var(--accent);background:#f1f1ff;}
 .class-opt .t{font-weight:700;font-size:13.5px;}
 .class-opt .s{font-size:11px;color:var(--text-dim);margin-top:3px;}
+.slots-day{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--accent);margin:14px 0 8px;}
+.slots-day:first-child{margin-top:0;}
+.slots-row{display:flex;flex-wrap:wrap;gap:8px;}
+.slot-btn{
+  border:1.5px solid var(--border);background:#fff;border-radius:9px;padding:9px 14px;
+  font-size:13px;font-weight:600;cursor:pointer;color:var(--text);
+}
+.slot-btn:hover{border-color:var(--accent);}
+.slot-btn.selected{background:var(--accent);border-color:var(--accent);color:#fff;}
 .btn-submit{
   width:100%;padding:13px;border:none;border-radius:10px;
   background:linear-gradient(135deg,var(--accent),#7b7ffb);color:#fff;
@@ -59,6 +69,8 @@ body{
 .success-card h2{margin:0 0 8px;font-size:19px;}
 .success-card p{color:var(--text-dim);font-size:13.5px;line-height:1.6;}
 .footer-note{text-align:center;color:#8890b8;font-size:11.5px;margin-top:18px;}
+.empty-slots{color:var(--text-dim);font-size:13px;text-align:center;padding:20px 10px;}
+.spinner-line{color:var(--text-dim);font-size:13px;padding:10px 0;}
 </style>
 </head>
 <body>
@@ -66,43 +78,38 @@ body{
   <div class="hero">
     <div class="logo" id="logoHero"></div>
     <h1>Agenda tu clase personalizada</h1>
-    <p>Cuéntanos qué quieres automatizar en Excel o Power BI y te contactamos para confirmar el horario de tu clase 1 a 1.</p>
+    <p>Elige la plataforma y un horario disponible con tu profesor. Tu clase queda confirmada al instante.</p>
   </div>
 
   <div class="card" id="formCard">
     <div class="msg" id="formMsg"></div>
-    <form id="claseForm">
-      <div class="form-group">
-        <label>¿Qué clase quieres?</label>
-        <div class="class-options">
-          <div class="class-opt" data-tipo="Clase Excel">
-            <div class="t">Excel</div>
-            <div class="s">Macros, tablas dinámicas, automatización</div>
-          </div>
-          <div class="class-opt" data-tipo="Clase Power BI">
-            <div class="t">Power BI</div>
-            <div class="s">Dashboards e informes automáticos</div>
-          </div>
-        </div>
+
+    <div class="step-title">1. ¿Qué clase quieres?</div>
+    <div class="class-options">
+      <div class="class-opt" data-plat="excel">
+        <div class="t">Excel</div>
+        <div class="s">Macros, tablas dinámicas, automatización</div>
       </div>
+      <div class="class-opt" data-plat="powerbi">
+        <div class="t">Power BI</div>
+        <div class="s">Dashboards e informes automáticos</div>
+      </div>
+    </div>
+
+    <div id="slotsSection" style="display:none;">
+      <div class="step-title">2. Elige un horario disponible</div>
+      <div id="slotsList"><div class="spinner-line">Cargando horarios...</div></div>
+    </div>
+
+    <form id="claseForm" style="display:none;margin-top:22px;">
+      <div class="step-title">3. Tus datos</div>
       <div class="form-group"><label>Nombre completo</label><input type="text" id="f_nombre" required placeholder="Tu nombre"></div>
       <div class="form-row">
         <div class="form-group"><label>Correo</label><input type="email" id="f_email" required placeholder="tucorreo@ejemplo.com"></div>
         <div class="form-group"><label>Teléfono</label><input type="tel" id="f_telefono" placeholder="300 000 0000"></div>
       </div>
-      <div class="form-row">
-        <div class="form-group"><label>Fecha preferida</label><input type="date" id="f_fecha" required></div>
-        <div class="form-group"><label>Hora preferida</label><input type="time" id="f_hora" required></div>
-      </div>
-      <div class="form-group">
-        <label>Modalidad</label>
-        <select id="f_modalidad">
-          <option value="Virtual">Virtual</option>
-          <option value="Presencial">Presencial</option>
-        </select>
-      </div>
       <div class="form-group"><label>¿Qué te gustaría automatizar? (opcional)</label><textarea id="f_notas" placeholder="Ej: quiero automatizar el informe mensual de ventas..."></textarea></div>
-      <button type="submit" class="btn-submit" id="submitBtn">Solicitar clase</button>
+      <button type="submit" class="btn-submit" id="submitBtn">Confirmar clase</button>
     </form>
   </div>
 
@@ -128,14 +135,16 @@ const LOGO_SVG = `<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
 </svg>`;
 document.getElementById('logoHero').innerHTML = LOGO_SVG;
 
-let tipoClase = null;
-document.querySelectorAll('.class-opt').forEach(el=>{
-  el.addEventListener('click', ()=>{
-    document.querySelectorAll('.class-opt').forEach(o=>o.classList.remove('selected'));
-    el.classList.add('selected');
-    tipoClase = el.dataset.tipo;
-  });
-});
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+function fechaLarga(f){
+  const dias=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+  const meses=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+  const d=new Date(f+'T00:00:00'); if(isNaN(d)) return f;
+  return `${dias[d.getDay()]} ${d.getDate()} ${meses[d.getMonth()]}`;
+}
+
+let plataforma = null;
+let franjaSeleccionada = null;
 
 function showMsg(text, type){
   const el = document.getElementById('formMsg');
@@ -143,29 +152,77 @@ function showMsg(text, type){
   el.className = 'msg show ' + type;
 }
 
+document.querySelectorAll('.class-opt').forEach(el=>{
+  el.addEventListener('click', ()=>{
+    document.querySelectorAll('.class-opt').forEach(o=>o.classList.remove('selected'));
+    el.classList.add('selected');
+    plataforma = el.dataset.plat;
+    franjaSeleccionada = null;
+    document.getElementById('claseForm').style.display = 'none';
+    cargarFranjas();
+  });
+});
+
+async function cargarFranjas(){
+  document.getElementById('slotsSection').style.display = 'block';
+  const box = document.getElementById('slotsList');
+  box.innerHTML = '<div class="spinner-line">Cargando horarios...</div>';
+
+  const { data, error } = await sb.rpc('get_franjas_libres', { p_plataforma: plataforma });
+  if(error){
+    console.error(error);
+    box.innerHTML = '<div class="empty-slots">No pudimos cargar los horarios. Intenta de nuevo en unos minutos.</div>';
+    return;
+  }
+  if(!data.length){
+    box.innerHTML = '<div class="empty-slots">No hay horarios disponibles por ahora para esta plataforma. Escríbenos y te avisamos apenas se abran nuevos.</div>';
+    return;
+  }
+
+  let curFecha = '';
+  let html = '';
+  data.forEach(f=>{
+    if(f.fecha !== curFecha){
+      if(curFecha) html += '</div>';
+      curFecha = f.fecha;
+      html += `<div class="slots-day">${fechaLarga(f.fecha)}</div><div class="slots-row">`;
+    }
+    html += `<button type="button" class="slot-btn" data-id="${f.id}" data-fecha="${f.fecha}" data-hora="${f.hora}">${f.hora}</button>`;
+  });
+  html += '</div>';
+  box.innerHTML = html;
+
+  box.querySelectorAll('.slot-btn').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      box.querySelectorAll('.slot-btn').forEach(b=>b.classList.remove('selected'));
+      btn.classList.add('selected');
+      franjaSeleccionada = btn.dataset.id;
+      document.getElementById('claseForm').style.display = 'block';
+    });
+  });
+}
+
 document.getElementById('claseForm').addEventListener('submit', async (e)=>{
   e.preventDefault();
-  if(!tipoClase){ showMsg('Selecciona si quieres clase de Excel o Power BI.', 'error'); return; }
+  if(!franjaSeleccionada){ showMsg('Selecciona un horario disponible.', 'error'); return; }
 
   const btn = document.getElementById('submitBtn');
-  btn.disabled = true; btn.textContent = 'Enviando...';
+  btn.disabled = true; btn.textContent = 'Confirmando...';
 
-  const { error } = await sb.rpc('solicitar_clase', {
+  const { data, error } = await sb.rpc('reservar_franja', {
+    p_franja_id: franjaSeleccionada,
     p_nombre: document.getElementById('f_nombre').value.trim(),
     p_email: document.getElementById('f_email').value.trim(),
     p_telefono: document.getElementById('f_telefono').value.trim(),
-    p_tipo_clase: tipoClase,
-    p_fecha: document.getElementById('f_fecha').value,
-    p_hora: document.getElementById('f_hora').value,
-    p_modalidad: document.getElementById('f_modalidad').value,
     p_notas: document.getElementById('f_notas').value.trim(),
   });
 
-  btn.disabled = false; btn.textContent = 'Solicitar clase';
+  btn.disabled = false; btn.textContent = 'Confirmar clase';
 
-  if(error){
-    console.error(error);
-    showMsg('No pudimos enviar tu solicitud. Intenta de nuevo en unos minutos.', 'error');
+  if(error || (data && data.ok === false)){
+    const errMsg = (data && data.error) || 'No pudimos confirmar tu clase. Intenta de nuevo.';
+    showMsg(errMsg, 'error');
+    if(data && data.ok === false) cargarFranjas(); // refresca por si alguien más tomó ese horario
     return;
   }
 
@@ -174,8 +231,8 @@ document.getElementById('claseForm').addEventListener('submit', async (e)=>{
       <div class="icon">
         <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg>
       </div>
-      <h2>¡Solicitud enviada!</h2>
-      <p>Gracias por tu interés. Nuestro equipo revisará el horario propuesto y te contactará por correo o WhatsApp para confirmar tu clase.</p>
+      <h2>¡Clase confirmada!</h2>
+      <p>Tu clase de <b>${data.plataforma === 'excel' ? 'Excel' : 'Power BI'}</b> quedó agendada para el <b>${esc(fechaLarga(data.fecha))}</b> a las <b>${esc(data.hora)}</b>. Te contactaremos para confirmar los detalles.</p>
     </div>`;
 });
 </script>
