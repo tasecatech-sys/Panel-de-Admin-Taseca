@@ -616,7 +616,7 @@ function seedData(){
   return {
     clientes, ventas, facturas, agenda, productos, cotizaciones,
     cotizacionSeq:2,
-    config:{ empresa:'Taseca Software', moneda:'COP', consultorNombre:'Equipo Comercial', consultorCargo:'Consultor de Soluciones', consultorContacto:'contacto@taseca.tech | +57 300 000 0000' }
+    config:{ empresa:'Taseca Software', moneda:'COP', consultorNombre:'Equipo Comercial', consultorCargo:'Consultor de Soluciones', consultorContacto:'contacto@taseca.tech | +57 300 000 0000', plantillaCotizacionUrl:null, plantillaCotizacionNombre:null, plantillaFacturaUrl:null, plantillaFacturaNombre:null }
   };
 }
 
@@ -678,6 +678,8 @@ function configRowToObj(row){
   return {
     empresa: row.empresa, moneda:'COP',
     consultorNombre: row.consultor_nombre, consultorCargo: row.consultor_cargo, consultorContacto: row.consultor_contacto,
+    plantillaCotizacionUrl: row.plantilla_cotizacion_url, plantillaCotizacionNombre: row.plantilla_cotizacion_nombre,
+    plantillaFacturaUrl: row.plantilla_factura_url, plantillaFacturaNombre: row.plantilla_factura_nombre,
   };
 }
 async function updateConfigRow(patch){
@@ -687,9 +689,31 @@ async function updateConfigRow(patch){
   if(patch.consultorCargo !== undefined) dbPatch.consultor_cargo = patch.consultorCargo;
   if(patch.consultorContacto !== undefined) dbPatch.consultor_contacto = patch.consultorContacto;
   if(patch.cotizacionSeq !== undefined) dbPatch.cotizacion_seq = patch.cotizacionSeq;
+  if(patch.plantillaCotizacionUrl !== undefined) dbPatch.plantilla_cotizacion_url = patch.plantillaCotizacionUrl;
+  if(patch.plantillaCotizacionNombre !== undefined) dbPatch.plantilla_cotizacion_nombre = patch.plantillaCotizacionNombre;
+  if(patch.plantillaFacturaUrl !== undefined) dbPatch.plantilla_factura_url = patch.plantillaFacturaUrl;
+  if(patch.plantillaFacturaNombre !== undefined) dbPatch.plantilla_factura_nombre = patch.plantillaFacturaNombre;
   const { error } = await sb.from('config').update(dbPatch).eq('id',1);
   if(error){ console.error(error); toast('Error actualizando configuración'); throw error; }
 }
+async function uploadPlantilla(tipo, file){
+  const path = tipo + '/' + Date.now() + '_' + file.name;
+  const { error: upErr } = await sb.storage.from('plantillas').upload(path, file, { upsert:true });
+  if(upErr){ console.error(upErr); toast('Error subiendo la plantilla'); throw upErr; }
+  const { data } = sb.storage.from('plantillas').getPublicUrl(path);
+  const url = data.publicUrl;
+  if(tipo === 'cotizacion'){
+    await updateConfigRow({ plantillaCotizacionUrl:url, plantillaCotizacionNombre:file.name });
+    STATE.config.plantillaCotizacionUrl = url;
+    STATE.config.plantillaCotizacionNombre = file.name;
+  } else {
+    await updateConfigRow({ plantillaFacturaUrl:url, plantillaFacturaNombre:file.name });
+    STATE.config.plantillaFacturaUrl = url;
+    STATE.config.plantillaFacturaNombre = file.name;
+  }
+  toast('Plantilla actualizada correctamente');
+}
+
 
 async function seedTablesIfEmpty(){
   const seed = seedData();
@@ -2529,6 +2553,22 @@ function RENDER_CONFIG(){
       <button class="btn btn-primary" id="saveConfig">${ICONS.check} Guardar cambios</button>
     </div>
     <div class="card" style="max-width:520px;margin-top:18px;">
+      <div class="card-title">Plantillas de documentos</div>
+      <p style="font-size:12.5px;color:var(--text-dim);margin:0 0 14px;">Sube el archivo de plantilla (PDF o Word) que quieres usar como referencia para tus cotizaciones y facturas.</p>
+      <div class="form-group">
+        <label>Plantilla de Cotización</label>
+        ${STATE.config.plantillaCotizacionNombre ? `<div style="margin-bottom:8px;font-size:12.5px;">Archivo actual: <a href="${STATE.config.plantillaCotizacionUrl}" target="_blank" rel="noopener">${escapeHtml(STATE.config.plantillaCotizacionNombre)}</a></div>` : ''}
+        <input type="file" id="fileCotizacionPlantilla" accept=".pdf,.doc,.docx">
+        <button class="btn btn-outline" id="uploadCotizacionPlantilla" style="margin-top:8px;">${ICONS.check} Subir plantilla</button>
+      </div>
+      <div class="form-group" style="margin-top:18px;">
+        <label>Plantilla de Factura</label>
+        ${STATE.config.plantillaFacturaNombre ? `<div style="margin-bottom:8px;font-size:12.5px;">Archivo actual: <a href="${STATE.config.plantillaFacturaUrl}" target="_blank" rel="noopener">${escapeHtml(STATE.config.plantillaFacturaNombre)}</a></div>` : ''}
+        <input type="file" id="fileFacturaPlantilla" accept=".pdf,.doc,.docx">
+        <button class="btn btn-outline" id="uploadFacturaPlantilla" style="margin-top:8px;">${ICONS.check} Subir plantilla</button>
+      </div>
+    </div>
+    <div class="card" style="max-width:520px;margin-top:18px;">
       <div class="card-title">Datos en la nube (Supabase)</div>
       <p style="font-size:12.5px;color:var(--text-dim);line-height:1.6;">
         Toda la información de este panel (clientes, ventas, facturas, agenda y cotizaciones) se guarda en tu
@@ -2576,6 +2616,20 @@ function RENDER_CONFIG(){
     STATE.config.empresa = empresa;
     document.getElementById('companyNameLabel').textContent = STATE.config.empresa;
     toast('Configuración guardada');
+  };
+  document.getElementById('uploadCotizacionPlantilla').onclick = async ()=>{
+    const input = document.getElementById('fileCotizacionPlantilla');
+    const file = input.files[0];
+    if(!file){ toast('Selecciona un archivo primero'); return; }
+    await uploadPlantilla('cotizacion', file);
+    RENDER_CONFIG();
+  };
+  document.getElementById('uploadFacturaPlantilla').onclick = async ()=>{
+    const input = document.getElementById('fileFacturaPlantilla');
+    const file = input.files[0];
+    if(!file){ toast('Selecciona un archivo primero'); return; }
+    await uploadPlantilla('factura', file);
+    RENDER_CONFIG();
   };
   document.getElementById('exportBtn').onclick = ()=>{
     const blob = new Blob([JSON.stringify(STATE, null, 2)], {type:'application/json'});
