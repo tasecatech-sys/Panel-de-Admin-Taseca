@@ -1515,7 +1515,7 @@ function renderCotizacionEditor(){
     </div>
   `;
   document.getElementById('qeBack').onclick = backToCotizacionList;
-  document.getElementById('qePrint').onclick = ()=> window.print();
+  document.getElementById('qePrint').onclick = ()=> toast('La generación de PDF/Word para cotizaciones se está migrando a una plantilla Word. Próximamente disponible.');
   document.getElementById('qeSave').onclick = saveCotizacion;
 
   renderQEForm();
@@ -1687,7 +1687,7 @@ function renderQEForm(){
   });
 }
 
-function renderQPPreview(){
+function renderQPPreview(){ return; /* Vista previa HTML eliminada: se reemplazará por generación desde plantilla Word */
   const cot = editingCotizacion;
   const t = computeTotals(cot);
   const numeroPreview = cot.numero || ('TSC-'+new Date().getFullYear()+'-'+String(STATE.cotizacionSeq).padStart(3,'0')+' (borrador)');
