@@ -1,69 +1,164 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="es">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TASECA · Mi Plan de Estudio</title>
+<title>Taseca | Agenda tu clase y Mi avance</title>
 <style>
-  :root{ --lime:#C5FF3D; --bg:#07090c; --panel:#0e1319; --panel2:#141b23; --text-dim:#9ca3af; }
-  *{box-sizing:border-box;}
-  body{
-    margin:0; font-family:'Segoe UI',system-ui,sans-serif; color:#e5e7eb; min-height:100vh;
-    background: radial-gradient(circle at 20% 0%, rgba(197,255,61,.06), transparent 40%),
-      radial-gradient(circle at 90% 100%, rgba(45,212,191,.05), transparent 40%), var(--bg);
-  }
-  .lime{ color:var(--lime); }
-  .wrap{ max-width:880px; margin:0 auto; padding:28px 16px 60px; }
-  .panel{ background:var(--panel); border:1px solid rgba(197,255,61,.08); border-radius:24px; }
-  .panel2{ background:var(--panel2); border-radius:16px; }
-  .brand{ font-weight:800; letter-spacing:.25em; background:linear-gradient(90deg,#e8b33a,var(--lime),#2dd4bf);
-    -webkit-background-clip:text; background-clip:text; color:transparent; }
-  .mono{ font-family:'Courier New',monospace; letter-spacing:.15em; }
-  input{ color:#e5e7eb; background:var(--panel2); border:1px solid #374151; border-radius:14px; padding:14px 16px; width:100%; font-size:16px; }
-  input::placeholder{ color:#6b7280; }
-  .btn-lime{ background:var(--lime); color:#0a0e12; font-weight:700; border:none; border-radius:16px; padding:14px; width:100%; font-size:15px; cursor:pointer; }
-  .btn-lime:hover{ background:#d6ff6b; }
-  .btn-lime:disabled{ opacity:.6; cursor:default; }
-  .spinner{ border:3px solid rgba(197,255,61,.15); border-top-color:var(--lime); border-radius:50%; width:20px; height:20px; animation:spin .7s linear infinite; display:inline-block; }
-  @keyframes spin{ to{ transform:rotate(360deg); } }
-  .badge-excel{ background:rgba(34,197,94,.15); color:#4ade80; border:1px solid rgba(34,197,94,.3); padding:2px 8px; border-radius:8px; font-size:10px; }
-  .badge-powerbi{ background:rgba(234,179,8,.15); color:#facc15; border:1px solid rgba(234,179,8,.3); padding:2px 8px; border-radius:8px; font-size:10px; }
-  .grid3{ display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:24px; }
-  @media(max-width:700px){ .grid3{ grid-template-columns:1fr; } }
-  .platcols{ display:grid; gap:16px; }
-  .err{ color:#f87171; font-size:13px; margin-top:10px; }
-  .ring text{ font-family:'Segoe UI',system-ui,sans-serif; }
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{
+font-family:'Segoe UI',system-ui,-apple-system,Roboto,Arial,sans-serif;
+color:#e5e7eb;min-height:100vh;
+background:
+radial-gradient(circle at 20% 0%, rgba(197,255,61,.06), transparent 40%),
+radial-gradient(circle at 90% 100%, rgba(45,212,191,.05), transparent 40%),
+linear-gradient(160deg,#12172b,#1b2140);
+}
+.screen{display:none;}
+.screen.active{display:block;}
+.tabbar{max-width:680px;margin:0 auto;display:flex;gap:10px;justify-content:center;padding:22px 16px 0;}
+.tabbtn{background:rgba(255,255,255,.06);color:#cbd5e1;border:1px solid rgba(255,255,255,.14);padding:10px 20px;border-radius:12px;font-weight:700;font-size:13px;cursor:pointer;}
+.tabbtn:hover{border-color:rgba(255,255,255,.35);}
+.tabbtn.active{background:#C5FF3D;color:#0a0e12;border-color:transparent;}
+#screen-agendar{ --bg:#f4f6fb; --panel:#ffffff; --border:#e4e8f1; --text:#1c2333; --text-dim:#697086; --accent:#5b5ff2; --accent-2:#17c3b2; --danger:#e0525f; --ok:#26b26a; --radius:16px; }
+#screen-agendar.wrap{width:100%;max-width:680px;margin:0 auto;padding:24px;}
+#screen-agendar .hero{color:#fff;text-align:center;margin-bottom:22px;}
+#screen-agendar .logo{width:64px;height:64px;margin:0 auto 12px;}
+#screen-agendar .hero h1{font-size:22px;margin:0 0 6px;font-weight:700;}
+#screen-agendar .hero p{font-size:13.5px;color:#b9bedd;margin:0 auto;max-width:460px;line-height:1.5;}
+#screen-agendar .card{background:var(--panel);border-radius:var(--radius);padding:28px 26px;box-shadow:0 20px 60px rgba(0,0,0,.35);margin-top:22px;}
+#screen-agendar .step-title{font-size:12.5px;font-weight:800;color:var(--text-dim);text-transform:uppercase;letter-spacing:.04em;margin:0 0 12px;}
+#screen-agendar .form-group{margin-bottom:16px;}
+#screen-agendar .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+#screen-agendar .form-group label{display:block;font-size:12.5px;font-weight:700;color:var(--text-dim);margin-bottom:6px;}
+#screen-agendar .form-group input,#screen-agendar .form-group textarea{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:9px;font-size:13.5px;font-family:inherit;outline:none;background:#fff;color:var(--text);}
+#screen-agendar .form-group input:focus,#screen-agendar .form-group textarea:focus{border-color:var(--accent);}
+#screen-agendar .form-group textarea{resize:vertical;min-height:70px;}
+#screen-agendar .class-options{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:22px;}
+#screen-agendar .class-opt{border:1.5px solid var(--border);border-radius:11px;padding:14px;cursor:pointer;text-align:center;}
+#screen-agendar .class-opt.selected{border-color:var(--accent);background:#f1f1ff;}
+#screen-agendar .class-opt .t{font-weight:700;font-size:13.5px;}
+#screen-agendar .class-opt .s{font-size:11px;color:var(--text-dim);margin-top:3px;}
+#screen-agendar .slots-day{font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.04em;color:var(--accent);margin:14px 0 8px;}
+#screen-agendar .slots-day:first-child{margin-top:0;}
+#screen-agendar .slots-row{display:flex;flex-wrap:wrap;gap:8px;}
+#screen-agendar .slot-btn{border:1.5px solid var(--border);background:#fff;border-radius:9px;padding:9px 14px;font-size:13px;font-weight:600;cursor:pointer;color:var(--text);}
+#screen-agendar .slot-btn:hover{border-color:var(--accent);}
+#screen-agendar .slot-btn.selected{background:var(--accent);border-color:var(--accent);color:#fff;}
+#screen-agendar .btn-submit{width:100%;padding:13px;border:none;border-radius:10px;background:linear-gradient(135deg,var(--accent),#7b7ffb);color:#fff;font-size:14px;font-weight:700;cursor:pointer;margin-top:6px;}
+#screen-agendar .btn-submit:disabled{opacity:.6;cursor:default;}
+#screen-agendar .msg{padding:11px 14px;border-radius:9px;font-size:13px;margin-bottom:16px;display:none;}
+#screen-agendar .msg.show{display:block;}
+#screen-agendar .msg.error{background:#fdecee;color:var(--danger);}
+#screen-agendar .msg.ok{background:#e4f8ee;color:#1f9f5c;}
+#screen-agendar .success-card{text-align:center;padding:40px 26px;}
+#screen-agendar .success-card .icon{width:56px;height:56px;background:#e4f8ee;color:var(--ok);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;}
+#screen-agendar .success-card h2{margin:0 0 8px;font-size:19px;}
+#screen-agendar .success-card p{color:var(--text-dim);font-size:13.5px;line-height:1.6;}
+#screen-agendar .footer-note{text-align:center;color:#8890b8;font-size:11.5px;margin-top:18px;}
+#screen-agendar .empty-slots{color:var(--text-dim);font-size:13px;text-align:center;padding:20px 10px;}
+#screen-agendar .spinner-line{color:var(--text-dim);font-size:13px;padding:10px 0;}
+#screen-avance{ --lime:#C5FF3D; --panel:#0e1319; --panel2:#141b23; --text-dim:#9ca3af; }
+#screen-avance .lime{ color:var(--lime); }
+#screen-avance.wrapAvance{ max-width:880px; margin:0 auto; padding:28px 16px 60px; }
+#screen-avance .panel{ background:var(--panel); border:1px solid rgba(197,255,61,.08); border-radius:24px; }
+#screen-avance .panel2{ background:var(--panel2); border-radius:16px; }
+#screen-avance .brand{ font-weight:800; letter-spacing:.25em; background:linear-gradient(90deg,#e8b33a,var(--lime),#2dd4bf); -webkit-background-clip:text; background-clip:text; color:transparent; }
+#screen-avance .mono{ font-family:'Courier New',monospace; letter-spacing:.15em; }
+#screen-avance input{ color:#e5e7eb; background:var(--panel2); border:1px solid #374151; border-radius:14px; padding:14px 16px; width:100%; font-size:16px; }
+#screen-avance input::placeholder{ color:#6b7280; }
+#screen-avance .btn-lime{ background:var(--lime); color:#0a0e12; font-weight:700; border:none; border-radius:16px; padding:14px; width:100%; font-size:15px; cursor:pointer; }
+#screen-avance .btn-lime:hover{ background:#d6ff6b; }
+#screen-avance .btn-lime:disabled{ opacity:.6; cursor:default; }
+#screen-avance .spinner{ border:3px solid rgba(197,255,61,.15); border-top-color:var(--lime); border-radius:50%; width:20px; height:20px; animation:spin .7s linear infinite; display:inline-block; }
+@keyframes spin{ to{ transform:rotate(360deg); } }
+#screen-avance .badge-excel{ background:rgba(34,197,94,.15); color:#4ade80; border:1px solid rgba(34,197,94,.3); padding:2px 8px; border-radius:8px; font-size:10px; }
+#screen-avance .badge-powerbi{ background:rgba(234,179,8,.15); color:#facc15; border:1px solid rgba(234,179,8,.3); padding:2px 8px; border-radius:8px; font-size:10px; }
+#screen-avance .grid3{ display:grid; grid-template-columns:repeat(3,1fr); gap:16px; margin-bottom:24px; }
+@media(max-width:700px){ #screen-avance .grid3{ grid-template-columns:1fr; } }
+#screen-avance .platcols{ display:grid; gap:16px; }
+#screen-avance .err{ color:#f87171; font-size:13px; margin-top:10px; }
+#screen-avance .ring text{ font-family:'Segoe UI',system-ui,sans-serif; }
 </style>
 </head>
 <body>
-<div class="wrap">
 
-  <div id="loginBox" style="text-align:center;">
-    <div style="margin:24px 0;">
-      <svg width="90" height="90" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 8px rgba(197,255,61,.4));">
-        <polygon points="50,12 88,80 12,80" fill="none" stroke="var(--lime)" stroke-width="2.5"/>
-        <polygon points="50,24 78,74 22,74" fill="none" stroke="var(--lime)" stroke-width="1" stroke-dasharray="3 3" opacity=".5"/>
-        <ellipse cx="50" cy="52" rx="18" ry="10" fill="none" stroke="#e8b33a" stroke-width="2"/>
-        <circle cx="50" cy="52" r="5.5" fill="#e8b33a"/><circle cx="50" cy="52" r="2.2" fill="#07090c"/>
-        <rect x="40" y="64" width="3" height="6" fill="#2dd4bf"/><rect x="46" y="60" width="3" height="10" fill="#e8b33a"/>
-        <rect x="52" y="62" width="3" height="8" fill="#e8b33a"/><rect x="58" y="66" width="3" height="4" fill="#2dd4bf"/>
-      </svg>
-      <div class="mono" style="font-size:11px;color:#5eead4b0;margin-bottom:8px;">· SYSTEM ONLINE · ANALYTICS ENGINE v3.0 ·</div>
-      <h1 class="brand" style="font-size:2.6rem;margin:0 0 8px;">TASECA</h1>
-      <div class="mono" style="font-size:11px;color:#6b7280;">&lt; MI PLAN DE ESTUDIO · SEGUIMIENTO DE AVANCE /&gt;</div>
-    </div>
+<div class="tabbar">
+<button class="tabbtn active" data-screen="agendar">Agendar clase</button>
+<button class="tabbtn" data-screen="avance">Consultar mi avance</button>
+</div>
 
-    <div class="panel" style="padding:32px;max-width:420px;margin:0 auto;text-align:left;">
-      <h2 style="margin:0 0 4px;font-size:20px;">Consulta tu avance</h2>
-      <p style="color:var(--text-dim);font-size:13.5px;margin:0 0 18px;">Ingresa tu número de documento para ver tu progreso.</p>
-      <input id="ccInput" inputmode="numeric" placeholder="Número de documento (CC)" style="margin-bottom:12px;">
-      <button class="btn-lime" id="btnVer">Ver mi avance</button>
-      <p class="err" id="errMsg"></p>
-    </div>
-    <p class="mono" style="text-align:center;font-size:10px;color:#4b5563;margin-top:40px;">&lt; THE ALL-SEEING EYE · CONSULTING ANALYTICS /&gt;</p>
-  </div>
+<div id="screen-agendar" class="wrap screen active">
+<div class="hero">
+<div class="logo" id="logoHero"></div>
+<h1>Agenda tu clase personalizada</h1>
+<p>Elige la plataforma y un horario disponible con tu profesor. Tu clase queda confirmada al instante.</p>
+</div>
 
-  <div id="resultBox" style="display:none;"></div>
+<div class="card" id="formCard">
+<div class="msg" id="formMsg"></div>
+
+<div class="step-title">1. &iquest;Qu&eacute; clase quieres?</div>
+<div class="class-options">
+<div class="class-opt" data-plat="excel">
+<div class="t">Excel</div>
+<div class="s">Macros, tablas din&aacute;micas, automatizaci&oacute;n</div>
+</div>
+<div class="class-opt" data-plat="powerbi">
+<div class="t">Power BI</div>
+<div class="s">Dashboards e informes autom&aacute;ticos</div>
+</div>
+</div>
+
+<div id="slotsSection" style="display:none;">
+<div class="step-title">2. Elige un horario disponible</div>
+<div id="slotsList"><div class="spinner-line">Cargando horarios...</div></div>
+</div>
+
+<form id="claseForm" style="display:none;margin-top:22px;">
+<div class="step-title">3. Tus datos</div>
+<div class="form-group"><label>Nombre completo</label><input type="text" id="f_nombre" required placeholder="Tu nombre"></div>
+<div class="form-row">
+<div class="form-group"><label>Correo</label><input type="email" id="f_email" required placeholder="tucorreo@ejemplo.com"></div>
+<div class="form-group"><label>Tel&eacute;fono</label><input type="tel" id="f_telefono" placeholder="300 000 0000"></div>
+</div>
+<div class="form-group"><label>&iquest;Qu&eacute; te gustar&iacute;a automatizar? (opcional)</label><textarea id="f_notas" placeholder="Ej: quiero automatizar el informe mensual de ventas..."></textarea></div>
+<button type="submit" class="btn-submit" id="submitBtn">Confirmar clase</button>
+</form>
+</div>
+
+<div class="footer-note">Taseca Software &middot; The All-Seeing Eye Consulting Analytics</div>
+</div>
+
+<div id="screen-avance" class="wrapAvance screen">
+
+<div id="loginBox" style="text-align:center;">
+<div style="margin:24px 0;">
+<svg width="90" height="90" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 8px rgba(197,255,61,.4));">
+<polygon points="50,12 88,80 12,80" fill="none" stroke="var(--lime)" stroke-width="2.5"/>
+<polygon points="50,24 78,74 22,74" fill="none" stroke="var(--lime)" stroke-width="1" stroke-dasharray="3 3" opacity=".5"/>
+<ellipse cx="50" cy="52" rx="18" ry="10" fill="none" stroke="#e8b33a" stroke-width="2"/>
+<circle cx="50" cy="52" r="5.5" fill="#e8b33a"/><circle cx="50" cy="52" r="2.2" fill="#07090c"/>
+<rect x="40" y="64" width="3" height="6" fill="#2dd4bf"/><rect x="46" y="60" width="3" height="10" fill="#e8b33a"/>
+<rect x="52" y="62" width="3" height="8" fill="#e8b33a"/><rect x="58" y="66" width="3" height="4" fill="#2dd4bf"/>
+</svg>
+<div class="mono" style="font-size:11px;color:#5eead4b0;margin-bottom:8px;">&middot; SYSTEM ONLINE &middot; ANALYTICS ENGINE v3.0 &middot;</div>
+<h1 class="brand" style="font-size:2.6rem;margin:0 0 8px;">TASECA</h1>
+<div class="mono" style="font-size:11px;color:#6b7280;">&lt; MI PLAN DE ESTUDIO &middot; SEGUIMIENTO DE AVANCE /&gt;</div>
+</div>
+
+<div class="panel" style="padding:32px;max-width:420px;margin:0 auto;text-align:left;">
+<h2 style="margin:0 0 4px;font-size:20px;">Consulta tu avance</h2>
+<p style="color:var(--text-dim);font-size:13.5px;margin:0 0 18px;">Ingresa tu n&uacute;mero de documento para ver tu progreso.</p>
+<input id="ccInput" inputmode="numeric" placeholder="N&uacute;mero de documento (CC)" style="margin-bottom:12px;">
+<button class="btn-lime" id="btnVer">Ver mi avance</button>
+<p class="err" id="errMsg"></p>
+</div>
+<p class="mono" style="text-align:center;font-size:10px;color:#4b5563;margin-top:40px;">&lt; THE ALL-SEEING EYE &middot; CONSULTING ANALYTICS /&gt;</p>
+</div>
+
+<div id="resultBox" style="display:none;"></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -71,117 +166,182 @@
 const SUPABASE_URL = 'https://mzxyqkbhrcegiyqbbazp.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_71sDgXwdaGSomzG2U24vkw_1N4JWhF-';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const esc = s => String(s==null?'':s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+
+document.querySelectorAll('.tabbtn').forEach(btn=>{
+btn.addEventListener('click', ()=>{
+document.querySelectorAll('.tabbtn').forEach(b=>b.classList.remove('active'));
+btn.classList.add('active');
+document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+document.getElementById('screen-'+btn.dataset.screen).classList.add('active');
+});
+});
+
+const LOGO_SVG = `<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
+<circle cx="60" cy="60" r="54" fill="none" stroke="rgba(0,255,255,0.25)" stroke-width="0.5" stroke-dasharray="2 4"/>
+<circle cx="22" cy="28" r="1.5" fill="#FFD700"/><circle cx="95" cy="40" r="1.5" fill="#00FFFF"/><circle cx="45" cy="110" r="1.5" fill="#FFD700"/>
+<polygon points="60,12 108,95 12,95" fill="none" stroke="#FFD700" stroke-width="3" stroke-linejoin="round"/>
+<polygon points="60,20 100,90 20,90" fill="none" stroke="rgba(0,255,255,0.4)" stroke-width="1" stroke-dasharray="3 3"/>
+<path d="M 35 52 Q 60 30 85 52 Q 60 74 35 52" fill="none" stroke="#FFD700" stroke-width="2.5"/>
+<circle cx="60" cy="52" r="8" fill="none" stroke="#00FFFF" stroke-width="2.5"/><circle cx="60" cy="52" r="3" fill="#00FFFF"/>
+<line x1="60" y1="28" x2="60" y2="38" stroke="#00FFFF" stroke-width="1.5"/>
+<rect x="42" y="78" width="5" height="6" fill="#00FFFF"/><rect x="50" y="70" width="5" height="14" fill="#FFD700"/>
+<rect x="58" y="74" width="5" height="10" fill="#FFD700"/><rect x="66" y="72" width="5" height="12" fill="#00FFFF"/>
+</svg>`;
+document.getElementById('logoHero').innerHTML = LOGO_SVG;
+
+function fechaLarga(f){
+const dias=['domingo','lunes','martes','mi\u00e9rcoles','jueves','viernes','s\u00e1bado'];
+const meses=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+const d=new Date(f+'T00:00:00'); if(isNaN(d)) return f;
+return `${dias[d.getDay()]} ${d.getDate()} ${meses[d.getMonth()]}`;
+}
+
+let plataforma = null;
+let franjaSeleccionada = null;
+
+function showMsg(text, type){
+const el = document.getElementById('formMsg');
+el.textContent = text;
+el.className = 'msg show ' + type;
+}
+
+document.querySelectorAll('.class-opt').forEach(el=>{
+el.addEventListener('click', ()=>{
+document.querySelectorAll('.class-opt').forEach(o=>o.classList.remove('selected'));
+el.classList.add('selected');
+plataforma = el.dataset.plat;
+franjaSeleccionada = null;
+document.getElementById('claseForm').style.display = 'none';
+cargarFranjas();
+});
+});
+
+async function cargarFranjas(){
+document.getElementById('slotsSection').style.display = 'block';
+const box = document.getElementById('slotsList');
+box.innerHTML = '<div class="spinner-line">Cargando horarios...</div>';
+
+const { data, error } = await sb.rpc('get_franjas_libres', { p_plataforma: plataforma });
+if(error){
+console.error(error);
+box.innerHTML = '<div class="empty-slots">No pudimos cargar los horarios. Intenta de nuevo en unos minutos.</div>';
+return;
+}
+if(!data.length){
+box.innerHTML = '<div class="empty-slots">No hay horarios disponibles por ahora para esta plataforma. Escr\u00edbenos y te avisamos apenas se abran nuevos.</div>';
+return;
+}
+
+let curFecha = '';
+let html = '';
+data.forEach(f=>{
+if(f.fecha !== curFecha){
+if(curFecha) html += '</div>';
+curFecha = f.fecha;
+html += '<div class="slots-day">' + fechaLarga(f.fecha) + '</div><div class="slots-row">';
+}
+html += '<button type="button" class="slot-btn" data-id="' + f.id + '" data-fecha="' + f.fecha + '" data-hora="' + f.hora + '">' + f.hora + '</button>';
+});
+html += '</div>';
+box.innerHTML = html;
+
+box.querySelectorAll('.slot-btn').forEach(btn=>{
+btn.addEventListener('click', ()=>{
+box.querySelectorAll('.slot-btn').forEach(b=>b.classList.remove('selected'));
+btn.classList.add('selected');
+franjaSeleccionada = btn.dataset.id;
+document.getElementById('claseForm').style.display = 'block';
+});
+});
+}
+
+document.getElementById('claseForm').addEventListener('submit', async (e)=>{
+e.preventDefault();
+if(!franjaSeleccionada){ showMsg('Selecciona un horario disponible.', 'error'); return; }
+
+const btn = document.getElementById('submitBtn');
+btn.disabled = true; btn.textContent = 'Confirmando...';
+
+const { data, error } = await sb.rpc('reservar_franja', {
+p_franja_id: franjaSeleccionada,
+p_nombre: document.getElementById('f_nombre').value.trim(),
+p_email: document.getElementById('f_email').value.trim(),
+p_telefono: document.getElementById('f_telefono').value.trim(),
+p_notas: document.getElementById('f_notas').value.trim(),
+});
+
+btn.disabled = false; btn.textContent = 'Confirmar clase';
+
+if(error || (data && data.ok === false)){
+const errMsg = (data && data.error) || 'No pudimos confirmar tu clase. Intenta de nuevo.';
+showMsg(errMsg, 'error');
+if(data && data.ok === false) cargarFranjas();
+return;
+}
+
+document.getElementById('formCard').innerHTML = '<div class="success-card"><div class="icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></div><h2>\u00a1Clase confirmada!</h2><p>Tu clase de <b>' + (data.plataforma === 'excel' ? 'Excel' : 'Power BI') + '</b> qued\u00f3 agendada para el <b>' + esc(fechaLarga(data.fecha)) + '</b> a las <b>' + esc(data.hora) + '</b>. Te contactaremos para confirmar los detalles.</p></div>';
+});
 
 const PLAT_LABEL = { excel:'Excel', powerbi:'Power BI' };
-const platBadge = p => `<span class="badge-${p}">${PLAT_LABEL[p]}</span>`;
-const esc = s => String(s==null?'':s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+const platBadge = p => '<span class="badge-' + p + '">' + PLAT_LABEL[p] + '</span>';
 
 document.getElementById('ccInput').addEventListener('keydown', e=>{ if(e.key==='Enter') verAvance(); });
 document.getElementById('btnVer').addEventListener('click', verAvance);
 
 async function verAvance(){
-  const cc = document.getElementById('ccInput').value.trim();
-  const err = document.getElementById('errMsg');
-  err.textContent = '';
-  if(!cc){ err.textContent = 'Escribe tu número de documento.'; return; }
+const cc = document.getElementById('ccInput').value.trim();
+const err = document.getElementById('errMsg');
+err.textContent = '';
+if(!cc){ err.textContent = 'Escribe tu n\u00famero de documento.'; return; }
 
-  const btn = document.getElementById('btnVer');
-  btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
+const btn = document.getElementById('btnVer');
+btn.disabled = true; btn.innerHTML = '<span class="spinner"></span>';
 
-  const { data, error } = await sb.rpc('get_avance_estudiante', { p_documento: cc });
+const { data, error } = await sb.rpc('get_avance_estudiante', { p_documento: cc });
 
-  btn.disabled = false; btn.textContent = 'Ver mi avance';
+btn.disabled = false; btn.textContent = 'Ver mi avance';
 
-  if(error){ console.error(error); err.textContent = 'No pudimos consultar tu avance. Intenta de nuevo.'; return; }
-  if(!data.ok){ err.textContent = data.error || 'Documento no encontrado.'; return; }
+if(error){ console.error(error); err.textContent = 'No pudimos consultar tu avance. Intenta de nuevo.'; return; }
+if(!data.ok){ err.textContent = data.error || 'Documento no encontrado.'; return; }
 
-  renderAvance(data);
+renderAvance(data);
 }
 
 function ringSVG(pct){
-  const r=52, c=2*Math.PI*r, off=c*(1-pct/100);
-  return `<svg class="ring" width="150" height="150" viewBox="0 0 130 130">
-    <circle cx="65" cy="65" r="${r}" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="12"/>
-    <circle cx="65" cy="65" r="${r}" fill="none" stroke="var(--lime)" stroke-width="12"
-      stroke-linecap="round" stroke-dasharray="${c}" stroke-dashoffset="${off}"
-      transform="rotate(-90 65 65)"/>
-    <text x="65" y="72" text-anchor="middle" font-size="28" font-weight="800" fill="var(--lime)">${pct}%</text>
-  </svg>`;
+const r=52, c=2*Math.PI*r, off=c*(1-pct/100);
+return '<svg class="ring" width="150" height="150" viewBox="0 0 130 130"><circle cx="65" cy="65" r="' + r + '" fill="none" stroke="rgba(255,255,255,.08)" stroke-width="12"/><circle cx="65" cy="65" r="' + r + '" fill="none" stroke="var(--lime)" stroke-width="12" stroke-linecap="round" stroke-dasharray="' + c + '" stroke-dashoffset="' + off + '" transform="rotate(-90 65 65)"/><text x="65" y="72" text-anchor="middle" font-size="28" font-weight="800" fill="var(--lime)">' + pct + '%</text></svg>';
 }
 
 function renderAvance(a){
-  document.getElementById('loginBox').style.display = 'none';
-  const box = document.getElementById('resultBox');
-  box.style.display = 'block';
+document.getElementById('loginBox').style.display = 'none';
+const box = document.getElementById('resultBox');
+box.style.display = 'block';
 
-  const plats = [...new Set(a.clases.map(c=>c.plataforma))];
-  const total = a.clases.length;
-  const vistas = a.clases.filter(c=>c.completed).length;
-  const pct = total ? Math.round(vistas/total*100) : 0;
+const plats = [...new Set(a.clases.map(c=>c.plataforma))];
+const total = a.clases.length;
+const vistas = a.clases.filter(c=>c.completed).length;
+const pct = total ? Math.round(vistas/total*100) : 0;
 
-  const platCards = plats.map(p=>{
-    const clasesPlat = a.clases.filter(c=>c.plataforma===p).sort((x,y)=>x.id-y.id);
-    const vistasList = clasesPlat.filter(c=>c.completed);
-    const pendientes = clasesPlat.filter(c=>!c.completed);
-    const vistasHtml = vistasList.length ? vistasList.map(c=>`
-      <div class="panel2" style="padding:12px 14px;">
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <span class="lime">✓</span> ${platBadge(p)} <span style="font-weight:600;font-size:13.5px;">${esc(c.titulo)}</span>
-        </div>
-        <div style="font-size:12px;color:var(--text-dim);margin-top:4px;">${esc(c.contenido||'')}</div>
-      </div>`).join('') : '<div style="color:var(--text-dim);font-size:13px;">Aún no has visto clases en esta plataforma.</div>';
+const platCards = plats.map(function(p){
+const clasesPlat = a.clases.filter(c=>c.plataforma===p).sort((x,y)=>x.id-y.id);
+const vistasList = clasesPlat.filter(c=>c.completed);
+const pendientes = clasesPlat.filter(c=>!c.completed);
+const vistasHtml = vistasList.length ? vistasList.map(function(c){
+return '<div class="panel2" style="padding:12px 14px;"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;"><span class="lime">\u2713</span> ' + platBadge(p) + ' <span style="font-weight:600;font-size:13.5px;">' + esc(c.titulo) + '</span></div><div style="font-size:12px;color:var(--text-dim);margin-top:4px;">' + esc(c.contenido||'') + '</div></div>';
+}).join('') : '<div style="color:var(--text-dim);font-size:13px;">A\u00fan no has visto clases en esta plataforma.</div>';
 
-    const proxima = pendientes[0];
-    const proxHtml = proxima ? `
-      <div style="border:1px dashed rgba(197,255,61,.4);border-radius:16px;padding:14px;margin-top:12px;">
-        <div class="mono lime" style="font-size:11px;margin-bottom:4px;">▶ PRÓXIMA CLASE</div>
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">${platBadge(p)}<span style="font-weight:600;">${esc(proxima.titulo)}</span></div>
-        <div style="font-size:12px;color:var(--text-dim);margin-top:4px;">${esc(proxima.contenido||'')}</div>
-      </div>` : `<div class="lime" style="font-size:13px;margin-top:12px;">🎉 ¡Completaste todas las clases de ${PLAT_LABEL[p]}!</div>`;
+const proxima = pendientes[0];
+const proxHtml = proxima ? (
+'<div style="border:1px dashed rgba(197,255,61,.4);border-radius:16px;padding:14px;margin-top:12px;"><div class="mono lime" style="font-size:11px;margin-bottom:4px;">\u25b6 PR\u00d3XIMA CLASE</div><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">' + platBadge(p) + '<span style="font-weight:600;">' + esc(proxima.titulo) + '</span></div><div style="font-size:12px;color:var(--text-dim);margin-top:4px;">' + esc(proxima.contenido||'') + '</div></div>'
+) : (
+'<div class="lime" style="font-size:13px;margin-top:12px;">\ud83c\udf89 \u00a1Completaste todas las clases de ' + PLAT_LABEL[p] + '!</div>'
+);
 
-    return `
-      <div class="panel" style="padding:22px;">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-          <h3 style="margin:0;font-weight:600;">${PLAT_LABEL[p]}</h3>
-          <span style="font-size:13px;color:var(--text-dim);">${vistasList.length}/${clasesPlat.length} vistas</span>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:8px;">${vistasHtml}</div>
-        ${proxHtml}
-      </div>`;
-  }).join('');
+return '<div class="panel" style="padding:22px;"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;"><h3 style="margin:0;font-weight:600;">' + PLAT_LABEL[p] + '</h3><span style="font-size:13px;color:var(--text-dim);">' + vistasList.length + '/' + clasesPlat.length + ' vistas</span></div><div style="display:flex;flex-direction:column;gap:8px;">' + vistasHtml + '</div>' + proxHtml + '</div>';
+}).join('');
 
-  box.innerHTML = `
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px;">
-      <div style="display:flex;align-items:center;gap:12px;">
-        <svg width="42" height="42" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 8px rgba(197,255,61,.4));">
-          <polygon points="50,12 88,80 12,80" fill="none" stroke="var(--lime)" stroke-width="3"/>
-          <ellipse cx="50" cy="52" rx="16" ry="9" fill="none" stroke="#e8b33a" stroke-width="2.5"/>
-          <circle cx="50" cy="52" r="5" fill="#e8b33a"/>
-        </svg>
-        <div><h1 class="brand" style="font-size:1.5rem;margin:0;">TASECA</h1><p style="color:var(--text-dim);font-size:12px;margin:2px 0 0;">${esc(a.nombre)}</p></div>
-      </div>
-      <button onclick="location.reload()" class="panel2" style="border:none;color:#e5e7eb;padding:9px 16px;border-radius:12px;cursor:pointer;font-size:13px;">Salir</button>
-    </div>
-
-    <div class="grid3">
-      <div class="panel" style="padding:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;">
-        ${ringSVG(pct)}
-        <div style="color:var(--text-dim);font-size:13px;margin-top:8px;">Avance general</div>
-      </div>
-      <div class="panel" style="padding:20px;display:flex;flex-direction:column;justify-content:center;">
-        <div class="lime" style="font-size:34px;font-weight:800;">${vistas}</div>
-        <div style="color:var(--text-dim);margin-top:4px;">Clases vistas</div>
-      </div>
-      <div class="panel" style="padding:20px;display:flex;flex-direction:column;justify-content:center;">
-        <div style="font-size:34px;font-weight:800;">${total-vistas}</div>
-        <div style="color:var(--text-dim);margin-top:4px;">Clases restantes</div>
-      </div>
-    </div>
-
-    <div class="platcols" style="grid-template-columns:${plats.length>1?'1fr 1fr':'1fr'};">${platCards}</div>
-
-    <p class="mono" style="text-align:center;font-size:10px;color:#4b5563;margin-top:32px;">&lt; THE ALL-SEEING EYE · CONSULTING ANALYTICS /&gt;</p>
-  `;
+box.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;flex-wrap:wrap;gap:12px;"><div style="display:flex;align-items:center;gap:12px;"><svg width="42" height="42" viewBox="0 0 100 100" style="filter:drop-shadow(0 0 8px rgba(197,255,61,.4));"><polygon points="50,12 88,80 12,80" fill="none" stroke="var(--lime)" stroke-width="3"/><ellipse cx="50" cy="52" rx="16" ry="9" fill="none" stroke="#e8b33a" stroke-width="2.5"/><circle cx="50" cy="52" r="5" fill="#e8b33a"/></svg><div><h1 class="brand" style="font-size:1.5rem;margin:0;">TASECA</h1><p style="color:var(--text-dim);font-size:12px;margin:2px 0 0;">' + esc(a.nombre) + '</p></div></div><button onclick="location.reload()" class="panel2" style="border:none;color:#e5e7eb;padding:9px 16px;border-radius:12px;cursor:pointer;font-size:13px;">Salir</button></div><div class="grid3"><div class="panel" style="padding:20px;display:flex;flex-direction:column;align-items:center;justify-content:center;">' + ringSVG(pct) + '<div style="color:var(--text-dim);font-size:13px;margin-top:8px;">Avance general</div></div><div class="panel" style="padding:20px;display:flex;flex-direction:column;justify-content:center;"><div class="lime" style="font-size:34px;font-weight:800;">' + vistas + '</div><div style="color:var(--text-dim);margin-top:4px;">Clases vistas</div></div><div class="panel" style="padding:20px;display:flex;flex-direction:column;justify-content:center;"><div style="font-size:34px;font-weight:800;">' + (total-vistas) + '</div><div style="color:var(--text-dim);margin-top:4px;">Clases restantes</div></div></div><div class="platcols" style="grid-template-columns:' + (plats.length>1?'1fr 1fr':'1fr') + ';">' + platCards + '</div><p class="mono" style="text-align:center;font-size:10px;color:#4b5563;margin-top:32px;">&lt; THE ALL-SEEING EYE &middot; CONSULTING ANALYTICS /&gt;</p>';
 }
 </script>
 </body>
