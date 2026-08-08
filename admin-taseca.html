@@ -248,9 +248,11 @@ select.filter, input.filter{
 .product-hero{
   border-radius:16px;padding:22px 24px;color:#fff;position:relative;overflow:hidden;
 }
-.product-hero.p1{background:linear-gradient(135deg,#5b5ff2,#7b3ff0);}
-.product-hero.p2{background:linear-gradient(135deg,#0e9184,#17c3b2);}
-.product-hero h2{margin:0 0 6px;font-size:19px;}
+.product-hero-actions{position:absolute;top:16px;right:16px;display:flex;gap:8px;}
+.icon-btn.light{background:rgba(255,255,255,.18);border-color:rgba(255,255,255,.3);color:#fff;}
+.icon-btn.light:hover{background:rgba(255,255,255,.3);color:#fff;}
+.icon-btn.light.danger:hover{background:#e0525f;border-color:#e0525f;color:#fff;}
+.product-hero h2{margin:0 0 6px;font-size:19px;padding-right:70px;}
 .product-hero p{margin:0;font-size:13px;opacity:.92;max-width:560px;line-height:1.5;}
 .plan-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:16px;}
 @media(max-width:900px){.plan-grid{grid-template-columns:1fr;}}
@@ -263,6 +265,11 @@ select.filter, input.filter{
 
 .segmentos{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px;}
 .segmento-chip{background:var(--panel-2);border:1px solid var(--border);padding:6px 12px;border-radius:100px;font-size:12px;font-weight:600;color:var(--text-dim);}
+
+.color-swatches{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px;}
+.color-swatch{width:28px;height:28px;border-radius:50%;cursor:pointer;border:2px solid transparent;box-shadow:0 0 0 1px var(--border) inset;}
+.color-swatch.selected{border-color:var(--text);}
+.incluye-check{display:flex;align-items:center;gap:8px;padding:8px 0;font-size:13px;}
 
 .upcoming-item{display:flex;gap:12px;align-items:flex-start;padding:11px 0;border-bottom:1px solid var(--border);}
 .upcoming-item:last-child{border-bottom:none;}
@@ -566,28 +573,42 @@ function seedData(){
     {id:uid(), clienteId:clientes[6].id, tipo:'Clase Power BI', fecha:addDays(7), hora:'16:00', duracion:'60 min', modalidad:'Virtual', estado:'Programada', notas:''},
   ];
 
-  const productos = {
-    agendamiento:{
-      nombre:'Sistema de Agendamiento de Citas',
+  const productos = [
+    {
+      id:uid(), slug:'agendamiento', tipo:'producto',
+      nombre:'Sistema de Agendamiento de Citas', etiqueta:'Agendamiento',
       descripcion:'Plataforma de reservas y gestión de citas online para barberías, salones de belleza, spas y estudios de tatuajes: agenda en línea, recordatorios automáticos, control de clientes y reportes de ocupación.',
       segmentos:['Barberías','Salones de belleza','Spas','Estudios de tatuajes'],
       planes:[
         {nombre:'Básico', precio:99000, features:['1 sede / 2 usuarios','Agenda online 24/7','Recordatorios por email']},
         {nombre:'Profesional', precio:180000, features:['Hasta 3 sedes','Recordatorios WhatsApp/SMS','Reportes de ocupación']},
         {nombre:'Premium', precio:249000, features:['Sedes ilimitadas','Programa de fidelización','Soporte prioritario']},
-      ]
+      ],
+      incluye:[], color:'violeta', orden:1, activo:true,
     },
-    'excel-bi':{
-      nombre:'Clases Personalizadas de Excel & Power BI',
+    {
+      id:uid(), slug:'excel-bi', tipo:'producto',
+      nombre:'Clases Personalizadas de Excel & Power BI', etiqueta:'Excel & Power BI',
       descripcion:'Formación práctica y personalizada para automatizar tareas rutinarias con Excel avanzado y Power BI: macros, tablas dinámicas, dashboards e informes automáticos que ahorran horas de trabajo manual.',
       segmentos:['Profesionales independientes','Áreas contables y financieras','Equipos de operaciones','Empresas (equipos completos)'],
       planes:[
         {nombre:'Individual', precio:120000, features:['Clases 1 a 1','Plan de automatización personalizado','Material de apoyo incluido']},
         {nombre:'Grupal', precio:350000, features:['Hasta 6 personas','Casos de uso del equipo','Sesiones grabadas']},
         {nombre:'Empresarial', precio:650000, features:['Diagnóstico de procesos','Automatización a medida','Soporte post-clase 30 días']},
-      ]
-    }
-  };
+      ],
+      incluye:[], color:'verde', orden:2, activo:true,
+    },
+    {
+      id:uid(), slug:'ambos', tipo:'combo',
+      nombre:'Agendamiento + Excel & Power BI', etiqueta:'Ambos productos',
+      descripcion:'Paquete combinado que integra el Sistema de Agendamiento de Citas con las Clases de Excel & Power BI: ideal para negocios que quieren digitalizar su operación y capacitar a su equipo con un solo pago mensual.',
+      segmentos:[],
+      planes:[
+        {nombre:'Grupal + Profesional', precio:410000, features:['Incluye Agendamiento Plan Profesional','Incluye Excel & Power BI Plan Grupal','Un solo pago mensual combinado']},
+      ],
+      incluye:['agendamiento','excel-bi'], color:'combo', orden:3, activo:true,
+    },
+  ];
 
   const cotizaciones = [
     {
@@ -616,7 +637,7 @@ function seedData(){
   return {
     clientes, ventas, facturas, agenda, productos, cotizaciones,
     cotizacionSeq:2,
-    config:{ empresa:'Taseca Software', moneda:'COP', consultorNombre:'Equipo Comercial', consultorCargo:'Consultor de Soluciones', consultorContacto:'contacto@taseca.tech | +57 300 000 0000', plantillaCotizacionUrl:null, plantillaCotizacionNombre:null, plantillaFacturaUrl:null, plantillaFacturaNombre:null }
+    config:{ empresa:'Taseca Software', moneda:'COP', consultorNombre:'Equipo Comercial', consultorCargo:'Consultor de Soluciones', consultorContacto:'contacto@taseca.tech | +57 300 000 0000' }
   };
 }
 
@@ -634,8 +655,9 @@ const TABLE_MAPS = {
   facturas: { clienteId:'cliente_id', producto:'producto', concepto:'concepto', monto:'monto', fechaEmision:'fecha_emision', fechaVenc:'fecha_venc', estado:'estado' },
   agenda: { clienteId:'cliente_id', tipo:'tipo', fecha:'fecha', hora:'hora', duracion:'duracion', modalidad:'modalidad', estado:'estado', notas:'notas' },
   cotizaciones: { numero:'numero', fecha:'fecha', validezDias:'validez_dias', estado:'estado', clienteId:'cliente_id', clienteNombre:'cliente_nombre', clienteContacto:'cliente_contacto', clienteEmail:'cliente_email', consultorNombre:'consultor_nombre', consultorCargo:'consultor_cargo', consultorContacto:'consultor_contacto', tipoServicio:'tipo_servicio', titulo:'titulo', resumen:'resumen', fases:'fases', items:'items', ivaPct:'iva_pct', formaPago:'forma_pago', tiempoEjecucion:'tiempo_ejecucion', notasAdicionales:'notas_adicionales' },
+  productos: { slug:'slug', tipo:'tipo', nombre:'nombre', etiqueta:'etiqueta', descripcion:'descripcion', segmentos:'segmentos', planes:'planes', incluye:'incluye', color:'color', orden:'orden', activo:'activo' },
 };
-const DATA_TABLES = ['clientes','ventas','facturas','agenda','cotizaciones'];
+const DATA_TABLES = ['clientes','ventas','facturas','agenda','cotizaciones','productos'];
 
 function toRow(table, obj){
   const map = TABLE_MAPS[table];
@@ -678,8 +700,6 @@ function configRowToObj(row){
   return {
     empresa: row.empresa, moneda:'COP',
     consultorNombre: row.consultor_nombre, consultorCargo: row.consultor_cargo, consultorContacto: row.consultor_contacto,
-    plantillaCotizacionUrl: row.plantilla_cotizacion_url, plantillaCotizacionNombre: row.plantilla_cotizacion_nombre,
-    plantillaFacturaUrl: row.plantilla_factura_url, plantillaFacturaNombre: row.plantilla_factura_nombre,
   };
 }
 async function updateConfigRow(patch){
@@ -689,31 +709,9 @@ async function updateConfigRow(patch){
   if(patch.consultorCargo !== undefined) dbPatch.consultor_cargo = patch.consultorCargo;
   if(patch.consultorContacto !== undefined) dbPatch.consultor_contacto = patch.consultorContacto;
   if(patch.cotizacionSeq !== undefined) dbPatch.cotizacion_seq = patch.cotizacionSeq;
-  if(patch.plantillaCotizacionUrl !== undefined) dbPatch.plantilla_cotizacion_url = patch.plantillaCotizacionUrl;
-  if(patch.plantillaCotizacionNombre !== undefined) dbPatch.plantilla_cotizacion_nombre = patch.plantillaCotizacionNombre;
-  if(patch.plantillaFacturaUrl !== undefined) dbPatch.plantilla_factura_url = patch.plantillaFacturaUrl;
-  if(patch.plantillaFacturaNombre !== undefined) dbPatch.plantilla_factura_nombre = patch.plantillaFacturaNombre;
   const { error } = await sb.from('config').update(dbPatch).eq('id',1);
   if(error){ console.error(error); toast('Error actualizando configuración'); throw error; }
 }
-async function uploadPlantilla(tipo, file){
-  const path = tipo + '/' + Date.now() + '_' + file.name;
-  const { error: upErr } = await sb.storage.from('plantillas').upload(path, file, { upsert:true });
-  if(upErr){ console.error(upErr); toast('Error subiendo la plantilla'); throw upErr; }
-  const { data } = sb.storage.from('plantillas').getPublicUrl(path);
-  const url = data.publicUrl;
-  if(tipo === 'cotizacion'){
-    await updateConfigRow({ plantillaCotizacionUrl:url, plantillaCotizacionNombre:file.name });
-    STATE.config.plantillaCotizacionUrl = url;
-    STATE.config.plantillaCotizacionNombre = file.name;
-  } else {
-    await updateConfigRow({ plantillaFacturaUrl:url, plantillaFacturaNombre:file.name });
-    STATE.config.plantillaFacturaUrl = url;
-    STATE.config.plantillaFacturaNombre = file.name;
-  }
-  toast('Plantilla actualizada correctamente');
-}
-
 
 async function seedTablesIfEmpty(){
   const seed = seedData();
@@ -723,6 +721,8 @@ async function seedTablesIfEmpty(){
   await sb.from('agenda').insert(seed.agenda.map(a=>toRow('agenda', a)));
   await sb.from('cotizaciones').insert(seed.cotizaciones.map(c=>toRow('cotizaciones', c)));
   await updateConfigRow({ empresa: seed.config.empresa, consultorNombre: seed.config.consultorNombre, consultorCargo: seed.config.consultorCargo, consultorContacto: seed.config.consultorContacto, cotizacionSeq: seed.cotizacionSeq });
+  const { count } = await sb.from('productos').select('*', {count:'exact', head:true});
+  if(!count) await sb.from('productos').insert(seed.productos.map(p=>toRow('productos', p)));
 }
 
 async function resetAllTables(){
@@ -740,13 +740,13 @@ async function dbFetchAllSafe(table){
 }
 
 async function fetchAllFromTables(){
-  const [clientes, ventas, facturas, agenda, cotizaciones, configRow, clasesCatalogo, progreso, horarios] = await Promise.all([
+  const [clientes, ventas, facturas, agenda, cotizaciones, configRow, clasesCatalogo, progreso, horarios, productos] = await Promise.all([
     dbFetchAll('clientes'), dbFetchAll('ventas'), dbFetchAll('facturas'), dbFetchAll('agenda'), dbFetchAll('cotizaciones'), loadConfigRow(),
-    dbFetchAllSafe('clases_catalogo'), dbFetchAllSafe('progreso'), dbFetchAllSafe('horarios'),
+    dbFetchAllSafe('clases_catalogo'), dbFetchAllSafe('progreso'), dbFetchAllSafe('horarios'), dbFetchAllSafe('productos'),
   ]);
   return {
     clientes, ventas, facturas, agenda, cotizaciones, clasesCatalogo, progreso, horarios,
-    productos: seedData().productos,
+    productos: productos.length ? productos.sort((a,b)=>(a.orden||0)-(b.orden||0)) : seedData().productos,
     cotizacionSeq: configRow ? (configRow.cotizacion_seq || 1) : 1,
     config: configRow ? configRowToObj(configRow) : { empresa:'Taseca Software', moneda:'COP', consultorNombre:'Equipo Comercial', consultorCargo:'Consultor de Soluciones', consultorContacto:'contacto@taseca.tech' },
   };
@@ -795,12 +795,52 @@ function clienteNombre(id){
   const c = STATE.clientes.find(c=>c.id===id);
   return c ? c.nombre : '—';
 }
-function productLabel(p){
-  return p==='agendamiento' ? 'Agendamiento' : p==='excel-bi' ? 'Excel & Power BI' : 'Ambos productos';
+const COLOR_PALETTE = {
+  violeta:{bg:'#eaeaff', fg:'#5b5ff2', grad:'linear-gradient(135deg,#5b5ff2,#7b3ff0)'},
+  verde:{bg:'#e2f9f5', fg:'#0e9184', grad:'linear-gradient(135deg,#0e9184,#17c3b2)'},
+  azul:{bg:'#e4f0ff', fg:'#2f6fed', grad:'linear-gradient(135deg,#2f6fed,#4fa3f7)'},
+  naranja:{bg:'#ffece2', fg:'#c1571f', grad:'linear-gradient(135deg,#e0745b,#ff9f5b)'},
+  rosado:{bg:'#ffe4f2', fg:'#c22c80', grad:'linear-gradient(135deg,#d6449b,#ff7ab8)'},
+  gris:{bg:'#eceef2', fg:'#4b5163', grad:'linear-gradient(135deg,#4b5163,#6b7280)'},
+  combo:{bg:'linear-gradient(90deg,#eaeaff,#e2f9f5)', fg:'#4a3fbf', grad:'linear-gradient(135deg,#5b5ff2,#17c3b2)'},
+};
+function productoBySlug(slug){
+  return STATE.productos.find(p=>p.slug===slug);
 }
-function productTagClass(p){
-  return p==='agendamiento' ? 'tag-agenda' : p==='excel-bi' ? 'tag-excel' : 'tag-ambos';
+function productoLabel(slug){
+  const p = productoBySlug(slug);
+  if(p) return p.etiqueta || p.nombre;
+  if(!slug) return '—';
+  return slug;
 }
+function productoColor(slug){
+  const p = productoBySlug(slug);
+  return COLOR_PALETTE[p && p.color] || COLOR_PALETTE.gris;
+}
+function productoTagHtml(slug, extraStyle){
+  const c = productoColor(slug);
+  return `<span class="tag-product" style="background:${c.bg};color:${c.fg};${extraStyle||''}">${escapeHtml(productoLabel(slug))}</span>`;
+}
+function defaultProductoSlug(){
+  const p = STATE.productos.find(p=>p.tipo!=='combo') || STATE.productos[0];
+  return p ? p.slug : '';
+}
+function productoSelectOptionsHtml(selected){
+  const productos = STATE.productos.filter(p=>p.tipo!=='combo').sort((a,b)=>(a.orden||0)-(b.orden||0));
+  const combos = STATE.productos.filter(p=>p.tipo==='combo').sort((a,b)=>(a.orden||0)-(b.orden||0));
+  const opt = p => `<option value="${p.slug}" ${selected===p.slug?'selected':''}>${escapeHtml(p.nombre)}</option>`;
+  let html = '';
+  if(productos.length) html += `<optgroup label="Productos">${productos.map(opt).join('')}</optgroup>`;
+  if(combos.length) html += `<optgroup label="Combos">${combos.map(opt).join('')}</optgroup>`;
+  return html || `<option value="">Sin productos en el catálogo</option>`;
+}
+function planDatalistHtml(id, slug){
+  const p = productoBySlug(slug);
+  return `<datalist id="${id}">${(p?p.planes:[]).map(pl=>`<option value="${escapeHtml(pl.nombre)}">`).join('')}</datalist>`;
+}
+// Compat: código legado que aún llama productLabel/productTagClass.
+function productLabel(p){ return productoLabel(p); }
+function productTagClass(){ return ''; }
 function estadoBadge(estado){
   const map = {
     'Activo':'badge-green','Lead':'badge-blue','Inactivo':'badge-gray',
@@ -928,9 +968,6 @@ function confirmDialog(message, onConfirm){
 function RENDER_DASHBOARD(){
   const clientesActivos = STATE.clientes.filter(c=>c.estado==='Activo');
   const mrr = clientesActivos.reduce((s,c)=>s+ (Number(c.valorMensual)||0), 0);
-  const mrrAgenda = clientesActivos.filter(c=>c.producto==='agendamiento').reduce((s,c)=>s+Number(c.valorMensual||0),0);
-  const mrrExcel = clientesActivos.filter(c=>c.producto==='excel-bi').reduce((s,c)=>s+Number(c.valorMensual||0),0);
-  const mrrAmbos = clientesActivos.filter(c=>c.producto==='ambos').reduce((s,c)=>s+Number(c.valorMensual||0),0);
 
   const pipelineAbierto = STATE.ventas.filter(v=>!['Ganado','Perdido'].includes(v.etapa));
   const pipelineValor = pipelineAbierto.reduce((s,v)=>s+Number(v.valor||0),0);
@@ -949,12 +986,12 @@ function RENDER_DASHBOARD(){
   const etapaCounts = etapas.map(e=>STATE.ventas.filter(v=>v.etapa===e).length);
   const maxEtapa = Math.max(1, ...etapaCounts);
 
-  const totalProdMrr = mrrAgenda+mrrExcel+mrrAmbos || 1;
-  const donutStops = [
-    {label:'Agendamiento', value:mrrAgenda, color:'#5b5ff2'},
-    {label:'Excel & Power BI', value:mrrExcel, color:'#17c3b2'},
-    {label:'Ambos', value:mrrAmbos, color:'#ff9f5b'},
-  ];
+  const donutStops = STATE.productos.map(p=>({
+    label: p.etiqueta || p.nombre,
+    color: (COLOR_PALETTE[p.color] || COLOR_PALETTE.gris).fg,
+    value: clientesActivos.filter(c=>c.producto===p.slug).reduce((s,c)=>s+Number(c.valorMensual||0),0),
+  })).filter(s=>s.value>0);
+  const totalProdMrr = donutStops.reduce((s,d)=>s+d.value,0) || 1;
   let acc = 0;
   const gradient = donutStops.map(s=>{
     const pct = (s.value/totalProdMrr)*100;
@@ -1065,9 +1102,7 @@ function RENDER_CLIENTES(){
         <div class="toolbar-left">
           <select class="filter" id="fProducto">
             <option value="">Todos los productos</option>
-            <option value="agendamiento">Agendamiento</option>
-            <option value="excel-bi">Excel & Power BI</option>
-            <option value="ambos">Ambos</option>
+            ${productoSelectOptionsHtml(clienteFiltro.producto)}
           </select>
           <select class="filter" id="fEstado">
             <option value="">Todos los estados</option>
@@ -1091,7 +1126,7 @@ function RENDER_CLIENTES(){
                   <div class="cell-dim">${escapeHtml(c.email||'')}</div>
                 </td>
                 <td>${escapeHtml(c.ciudad||'')} <span class="cell-dim">· ${escapeHtml(c.sector)}</span></td>
-                <td><span class="tag-product ${productTagClass(c.producto)}">${productLabel(c.producto)}</span></td>
+                <td>${productoTagHtml(c.producto)}</td>
                 <td class="cell-dim">${escapeHtml(c.plan||'-')}</td>
                 <td><span class="badge ${estadoBadge(c.estado)}"><span class="badge-dot"></span>${c.estado}</span></td>
                 <td class="cell-strong">${c.valorMensual ? formatCOP(c.valorMensual) : '—'}</td>
@@ -1125,7 +1160,7 @@ function RENDER_CLIENTES(){
 
 function openClienteModal(id){
   const editing = !!id;
-  const c = editing ? STATE.clientes.find(c=>c.id===id) : {nombre:'',sector:'',producto:'agendamiento',plan:'',email:'',telefono:'',ciudad:'',estado:'Lead',valorMensual:0,notas:''};
+  const c = editing ? STATE.clientes.find(c=>c.id===id) : {nombre:'',sector:'',producto:defaultProductoSlug(),plan:'',email:'',telefono:'',ciudad:'',estado:'Lead',valorMensual:0,notas:''};
   openModal(editing ? 'Editar cliente' : 'Nuevo cliente', `
     <div class="form-group"><label>Nombre / Empresa</label><input id="f_nombre" value="${escapeHtml(c.nombre)}" placeholder="Ej: Barbería El Corte Fino"></div>
     <div class="form-row">
@@ -1134,13 +1169,9 @@ function openClienteModal(id){
     </div>
     <div class="form-row">
       <div class="form-group"><label>Producto</label>
-        <select id="f_producto">
-          <option value="agendamiento" ${c.producto==='agendamiento'?'selected':''}>Agendamiento de citas</option>
-          <option value="excel-bi" ${c.producto==='excel-bi'?'selected':''}>Clases Excel & Power BI</option>
-          <option value="ambos" ${c.producto==='ambos'?'selected':''}>Ambos productos</option>
-        </select>
+        <select id="f_producto">${productoSelectOptionsHtml(c.producto)}</select>
       </div>
-      <div class="form-group"><label>Plan</label><input id="f_plan" value="${escapeHtml(c.plan||'')}" placeholder="Ej: Profesional"></div>
+      <div class="form-group"><label>Plan</label><input id="f_plan" value="${escapeHtml(c.plan||'')}" list="f_plan_list" placeholder="Ej: Profesional">${planDatalistHtml('f_plan_list', c.producto)}</div>
     </div>
     <div class="form-row">
       <div class="form-group"><label>Email</label><input id="f_email" value="${escapeHtml(c.email||'')}" placeholder="correo@ejemplo.com"></div>
@@ -1163,6 +1194,9 @@ function openClienteModal(id){
     <button class="btn btn-primary" id="saveBtn">${ICONS.check} Guardar</button>
   `);
   document.getElementById('cancelBtn').onclick = closeModal;
+  document.getElementById('f_producto').addEventListener('change', e=>{
+    document.getElementById('f_plan_list').outerHTML = planDatalistHtml('f_plan_list', e.target.value);
+  });
   document.getElementById('saveBtn').onclick = async ()=>{
     const nombre = document.getElementById('f_nombre').value.trim();
     if(!nombre){ toast('El nombre es obligatorio'); return; }
@@ -1215,7 +1249,7 @@ function RENDER_VENTAS(){
         ${deals.map(d=>`
           <div class="deal-card" data-deal="${d.id}">
             <div class="name">${escapeHtml(d.clienteId ? clienteNombre(d.clienteId) : (d.nombreLead||'Sin nombre'))}</div>
-            <div class="meta"><span class="tag-product ${productTagClass(d.producto)}" style="padding:2px 7px;">${productLabel(d.producto)}</span></div>
+            <div class="meta">${productoTagHtml(d.producto, 'padding:2px 7px;')}</div>
             <div class="meta">${escapeHtml(d.plan||'')} · ${formatDate(d.fecha)}</div>
             <div class="val">${formatCOP(d.valor)}</div>
           </div>`).join('')}
@@ -1228,7 +1262,7 @@ function RENDER_VENTAS(){
 
 function openVentaModal(id){
   const editing = !!id;
-  const v = editing ? STATE.ventas.find(v=>v.id===id) : {clienteId:'', nombreLead:'', producto:'agendamiento', plan:'', valor:0, etapa:'Prospecto', fecha:todayISO()};
+  const v = editing ? STATE.ventas.find(v=>v.id===id) : {clienteId:'', nombreLead:'', producto:defaultProductoSlug(), plan:'', valor:0, etapa:'Prospecto', fecha:todayISO()};
   const clienteOptions = STATE.clientes.map(c=>`<option value="${c.id}" ${v.clienteId===c.id?'selected':''}>${escapeHtml(c.nombre)}</option>`).join('');
   openModal(editing?'Editar oportunidad':'Nueva oportunidad', `
     <div class="form-group"><label>Cliente existente (opcional)</label>
@@ -1239,11 +1273,7 @@ function openVentaModal(id){
     </div>
     <div class="form-row">
       <div class="form-group"><label>Producto</label>
-        <select id="f_producto">
-          <option value="agendamiento" ${v.producto==='agendamiento'?'selected':''}>Agendamiento de citas</option>
-          <option value="excel-bi" ${v.producto==='excel-bi'?'selected':''}>Clases Excel & Power BI</option>
-          <option value="ambos" ${v.producto==='ambos'?'selected':''}>Ambos productos</option>
-        </select>
+        <select id="f_producto">${productoSelectOptionsHtml(v.producto)}</select>
       </div>
       <div class="form-group"><label>Plan</label><input id="f_plan" value="${escapeHtml(v.plan||'')}" placeholder="Ej: Profesional"></div>
     </div>
@@ -1515,7 +1545,7 @@ function renderCotizacionEditor(){
     </div>
   `;
   document.getElementById('qeBack').onclick = backToCotizacionList;
-  document.getElementById('qePrint').onclick = ()=> toast('La generación de PDF/Word para cotizaciones se está migrando a una plantilla Word. Próximamente disponible.');
+  document.getElementById('qePrint').onclick = ()=> window.print();
   document.getElementById('qeSave').onclick = saveCotizacion;
 
   renderQEForm();
@@ -1687,7 +1717,7 @@ function renderQEForm(){
   });
 }
 
-function renderQPPreview(){ return; /* Vista previa HTML eliminada: se reemplazará por generación desde plantilla Word */
+function renderQPPreview(){
   const cot = editingCotizacion;
   const t = computeTotals(cot);
   const numeroPreview = cot.numero || ('TSC-'+new Date().getFullYear()+'-'+String(STATE.cotizacionSeq).padStart(3,'0')+' (borrador)');
@@ -1818,33 +1848,201 @@ async function saveCotizacion(){
    PRODUCTOS
 ========================================================= */
 function RENDER_PRODUCTOS(){
-  const p1 = STATE.productos.agendamiento;
-  const p2 = STATE.productos['excel-bi'];
-  const clientesPorProducto = (key)=>STATE.clientes.filter(c=>c.producto===key || c.producto==='ambos').length;
+  const isAdmin = CURRENT_USER_ROLE === 'admin';
+  const productos = STATE.productos.filter(p=>p.tipo!=='combo').sort((a,b)=>(a.orden||0)-(b.orden||0));
+  const combos = STATE.productos.filter(p=>p.tipo==='combo').sort((a,b)=>(a.orden||0)-(b.orden||0));
+  const clientesPorProducto = (slug)=>STATE.clientes.filter(c=>c.producto===slug).length;
 
-  function productBlock(key, p, heroClass){
+  function productBlock(p){
+    const grad = (COLOR_PALETTE[p.color] || COLOR_PALETTE.violeta).grad;
+    const segmentos = p.tipo==='combo' ? (p.incluye||[]).map(s=>productoLabel(s)) : (p.segmentos||[]);
     return `
-      <div class="product-hero ${heroClass}">
-        <h2>${p.nombre}</h2>
-        <p>${p.descripcion}</p>
-        <div class="segmentos">${p.segmentos.map(s=>`<span class="segmento-chip" style="background:rgba(255,255,255,.15);color:#fff;border-color:rgba(255,255,255,.25);">${s}</span>`).join('')}</div>
+      <div class="product-hero" style="background:${grad};">
+        ${isAdmin ? `
+          <div class="product-hero-actions">
+            <button class="icon-btn light" data-edit-prod="${p.id}" title="Editar">${ICONS.edit}</button>
+            <button class="icon-btn light danger" data-del-prod="${p.id}" title="Eliminar">${ICONS.trash}</button>
+          </div>` : ''}
+        <h2>${escapeHtml(p.nombre)}</h2>
+        <p>${escapeHtml(p.descripcion||'')}</p>
+        ${segmentos.length ? `<div class="segmentos">${segmentos.map(s=>`<span class="segmento-chip" style="background:rgba(255,255,255,.15);color:#fff;border-color:rgba(255,255,255,.25);">${escapeHtml(s)}</span>`).join('')}</div>` : ''}
       </div>
       <div class="plan-grid">
-        ${p.planes.map((pl,i)=>`
+        ${(p.planes||[]).map(pl=>`
           <div class="plan-card">
-            <div class="stat">${clientesPorProducto(key)} clientes</div>
-            <h4>${pl.nombre}</h4>
+            <div class="stat">${clientesPorProducto(p.slug)} clientes</div>
+            <h4>${escapeHtml(pl.nombre)}</h4>
             <div class="price">${formatCOP(pl.precio)} <span>/ mes</span></div>
-            <ul>${pl.features.map(f=>`<li>${f}</li>`).join('')}</ul>
-          </div>`).join('')}
+            <ul>${(pl.features||[]).map(f=>`<li>${escapeHtml(f)}</li>`).join('')}</ul>
+          </div>`).join('') || `<div class="empty-state">${ICONS.empty}<div>Sin planes todavía</div></div>`}
       </div>
     `;
   }
 
   document.getElementById('view').innerHTML = `
-    <div style="margin-bottom:30px;">${productBlock('agendamiento', p1, 'p1')}</div>
-    <div>${productBlock('excel-bi', p2, 'p2')}</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div style="font-size:14px;font-weight:700;">Productos</div>
+      ${isAdmin ? `<button class="btn btn-primary btn-sm" id="btnNuevoProducto">${ICONS.plus} Nuevo producto</button>` : ''}
+    </div>
+    ${productos.length ? productos.map(p=>`<div style="margin-bottom:30px;">${productBlock(p)}</div>`).join('') : `<div class="card"><div class="empty-state">${ICONS.empty}<div>Aún no hay productos en el catálogo</div></div></div>`}
+
+    <div style="display:flex;align-items:center;justify-content:space-between;margin:26px 0 16px;">
+      <div style="font-size:14px;font-weight:700;">Promos y combos</div>
+      ${isAdmin ? `<button class="btn btn-outline btn-sm" id="btnNuevoCombo">${ICONS.plus} Nuevo combo</button>` : ''}
+    </div>
+    ${combos.length ? combos.map(p=>`<div style="margin-bottom:30px;">${productBlock(p)}</div>`).join('') : `<div class="card"><div class="empty-state">${ICONS.empty}<div>Aún no hay combos armados. Combina productos existentes en un paquete con precio especial.</div></div></div>`}
   `;
+
+  if(!isAdmin) return;
+  document.getElementById('btnNuevoProducto').addEventListener('click', ()=>openProductoModal(null, 'producto'));
+  document.getElementById('btnNuevoCombo').addEventListener('click', ()=>openProductoModal(null, 'combo'));
+  document.querySelectorAll('[data-edit-prod]').forEach(b=>b.addEventListener('click', ()=>openProductoModal(b.dataset.editProd)));
+  document.querySelectorAll('[data-del-prod]').forEach(b=>b.addEventListener('click', ()=>{
+    const p = STATE.productos.find(x=>x.id===b.dataset.delProd);
+    confirmDialog(`¿Eliminar <b>${escapeHtml(p.nombre)}</b> del catálogo? Los clientes ya asignados a este producto conservan su registro, pero dejará de aparecer como opción al crear nuevos clientes, ventas o facturas.`, async ()=>{
+      await dbDelete('productos', p.id);
+      STATE.productos = STATE.productos.filter(x=>x.id!==p.id);
+      RENDER_PRODUCTOS(); toast('Eliminado del catálogo');
+    });
+  }));
+}
+
+function blankProducto(tipo){
+  return {id:null, slug:'', tipo:tipo||'producto', nombre:'', etiqueta:'', descripcion:'', segmentos:[], planes:[{nombre:'', precio:0, features:['']}], incluye:[], color: tipo==='combo' ? 'combo' : 'violeta', orden:(STATE.productos.length||0)+1, activo:true};
+}
+
+function slugify(s){
+  return String(s||'').toLowerCase().trim()
+    .normalize('NFD').replace(new RegExp('[̀-ͯ]','g'),'')
+    .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+}
+
+let productoDraft = null;
+let productoDraftEditing = false;
+
+function openProductoModal(id, tipoNuevo){
+  productoDraftEditing = !!id;
+  const original = id ? STATE.productos.find(p=>p.id===id) : null;
+  productoDraft = original ? JSON.parse(JSON.stringify(original)) : blankProducto(tipoNuevo);
+  if(!productoDraft.planes.length) productoDraft.planes.push({nombre:'', precio:0, features:['']});
+
+  openModal(productoDraftEditing ? 'Editar '+(productoDraft.tipo==='combo'?'combo':'producto') : (productoDraft.tipo==='combo' ? 'Nuevo combo' : 'Nuevo producto'),
+    `<div id="prodFormBody"></div>`,
+    `${productoDraftEditing ? `<button class="btn btn-danger" id="prodDelBtn">${ICONS.trash} Eliminar</button>` : ''}
+     <button class="btn btn-outline" id="prodCancelBtn">Cancelar</button>
+     <button class="btn btn-primary" id="prodSaveBtn">${ICONS.check} Guardar</button>`
+  );
+  document.getElementById('prodCancelBtn').onclick = closeModal;
+  if(productoDraftEditing){
+    document.getElementById('prodDelBtn').onclick = ()=>{
+      confirmDialog(`¿Eliminar <b>${escapeHtml(productoDraft.nombre)}</b> del catálogo?`, async ()=>{
+        await dbDelete('productos', productoDraft.id);
+        STATE.productos = STATE.productos.filter(x=>x.id!==productoDraft.id);
+        closeModal(); RENDER_PRODUCTOS(); toast('Eliminado del catálogo');
+      });
+    };
+  }
+  document.getElementById('prodSaveBtn').onclick = async ()=>{
+    const nombre = productoDraft.nombre.trim();
+    if(!nombre){ toast('El nombre es obligatorio'); return; }
+    if(!productoDraft.slug){ productoDraft.slug = slugify(nombre); }
+    const dupe = STATE.productos.find(p=>p.slug===productoDraft.slug && p.id!==productoDraft.id);
+    if(dupe){ toast('Ya existe un producto con ese identificador (slug). Ajusta el nombre o el slug.'); return; }
+    productoDraft.planes = productoDraft.planes
+      .filter(pl=>pl.nombre && pl.nombre.trim())
+      .map(pl=>({nombre:pl.nombre.trim(), precio:Number(pl.precio)||0, features:(pl.features||[]).map(f=>f.trim()).filter(Boolean)}));
+    const data = {
+      slug: productoDraft.slug, tipo: productoDraft.tipo, nombre,
+      etiqueta: productoDraft.etiqueta.trim(), descripcion: productoDraft.descripcion.trim(),
+      segmentos: productoDraft.segmentos, planes: productoDraft.planes,
+      incluye: productoDraft.incluye, color: productoDraft.color,
+      orden: Number(productoDraft.orden)||0, activo: true,
+    };
+    if(productoDraftEditing){
+      await dbUpdate('productos', productoDraft.id, data);
+      Object.assign(original, data);
+    } else {
+      const created = await dbInsert('productos', {id:uid(), ...data});
+      STATE.productos.push(created);
+    }
+    closeModal(); RENDER_PRODUCTOS(); toast(productoDraftEditing ? 'Producto actualizado' : 'Producto creado');
+  };
+  renderProductoForm();
+}
+
+function renderProductoForm(){
+  const d = productoDraft;
+  const otrosProductos = STATE.productos.filter(p=>p.tipo!=='combo' && p.id!==d.id);
+  const wrap = document.getElementById('prodFormBody');
+  wrap.innerHTML = `
+    <div class="form-group"><label>Nombre</label><input id="p_nombre" value="${escapeHtml(d.nombre)}" placeholder="Ej: Sistema de Reservas para Restaurantes"></div>
+    <div class="form-row">
+      <div class="form-group"><label>Etiqueta corta (para tablas/badges)</label><input id="p_etiqueta" value="${escapeHtml(d.etiqueta)}" placeholder="Ej: Reservas Restaurantes"></div>
+      <div class="form-group"><label>Identificador (slug)</label><input id="p_slug" value="${escapeHtml(d.slug)}" placeholder="se genera del nombre"></div>
+    </div>
+    <div class="form-group"><label>Descripción</label><textarea id="p_descripcion" placeholder="Descripción del producto o servicio...">${escapeHtml(d.descripcion)}</textarea></div>
+    ${d.tipo==='combo' ? `
+      <div class="form-group"><label>Incluye estos productos</label>
+        ${otrosProductos.length ? otrosProductos.map(p=>`
+          <label class="incluye-check"><input type="checkbox" data-incluye="${p.slug}" ${d.incluye.includes(p.slug)?'checked':''}> ${escapeHtml(p.nombre)}</label>
+        `).join('') : `<div class="form-hint">Crea primero al menos un producto para poder armar un combo.</div>`}
+      </div>
+    ` : `
+      <div class="form-group"><label>Segmentos / público objetivo (separados por coma)</label>
+        <input id="p_segmentos" value="${escapeHtml((d.segmentos||[]).join(', '))}" placeholder="Ej: Restaurantes, Cafeterías, Food trucks">
+      </div>
+    `}
+    <div class="form-group"><label>Color</label>
+      <div class="color-swatches" id="p_colores">
+        ${Object.keys(COLOR_PALETTE).filter(c=>c!=='combo' || d.tipo==='combo').map(c=>`
+          <div class="color-swatch ${d.color===c?'selected':''}" data-color="${c}" style="background:${COLOR_PALETTE[c].grad};" title="${c}"></div>
+        `).join('')}
+      </div>
+    </div>
+    <div class="qe-section-title" style="margin-top:18px;"><span class="num">$</span>Planes / precios</div>
+    <div id="p_planes"></div>
+    <button class="btn btn-outline btn-sm qe-add-row" id="p_addPlan" type="button">${ICONS.plus} Agregar plan</button>
+  `;
+
+  document.getElementById('p_nombre').addEventListener('input', e=>{ d.nombre = e.target.value; });
+  document.getElementById('p_etiqueta').addEventListener('input', e=>{ d.etiqueta = e.target.value; });
+  document.getElementById('p_slug').addEventListener('input', e=>{ d.slug = slugify(e.target.value); });
+  document.getElementById('p_descripcion').addEventListener('input', e=>{ d.descripcion = e.target.value; });
+  if(d.tipo==='combo'){
+    wrap.querySelectorAll('[data-incluye]').forEach(el=>el.addEventListener('change', e=>{
+      const slug = el.dataset.incluye;
+      d.incluye = e.target.checked ? [...d.incluye, slug] : d.incluye.filter(s=>s!==slug);
+    }));
+  } else {
+    document.getElementById('p_segmentos').addEventListener('input', e=>{
+      d.segmentos = e.target.value.split(',').map(s=>s.trim()).filter(Boolean);
+    });
+  }
+  document.getElementById('p_colores').querySelectorAll('[data-color]').forEach(el=>el.addEventListener('click', ()=>{
+    d.color = el.dataset.color;
+    document.getElementById('p_colores').querySelectorAll('[data-color]').forEach(x=>x.classList.toggle('selected', x.dataset.color===d.color));
+  }));
+
+  const planesWrap = document.getElementById('p_planes');
+  planesWrap.innerHTML = d.planes.map((pl,i)=>`
+    <div class="qe-line">
+      <div class="qe-line-fields">
+        <input data-plan-nombre="${i}" value="${escapeHtml(pl.nombre)}" placeholder="Nombre del plan (Ej: Básico)">
+        <input data-plan-precio="${i}" type="number" min="0" step="1000" value="${pl.precio||0}" placeholder="Precio mensual (COP)">
+        <textarea data-plan-features="${i}" style="min-height:60px;" placeholder="Una característica por línea">${(pl.features||[]).join('\n')}</textarea>
+      </div>
+      <button class="qe-remove" data-plan-del="${i}" type="button">${ICONS.trash}</button>
+    </div>
+  `).join('');
+  planesWrap.querySelectorAll('[data-plan-nombre]').forEach(el=>el.addEventListener('input', e=>{ d.planes[+el.dataset.planNombre].nombre = e.target.value; }));
+  planesWrap.querySelectorAll('[data-plan-precio]').forEach(el=>el.addEventListener('input', e=>{ d.planes[+el.dataset.planPrecio].precio = Number(e.target.value)||0; }));
+  planesWrap.querySelectorAll('[data-plan-features]').forEach(el=>el.addEventListener('input', e=>{ d.planes[+el.dataset.planFeatures].features = e.target.value.split('\n'); }));
+  planesWrap.querySelectorAll('[data-plan-del]').forEach(el=>el.addEventListener('click', ()=>{
+    d.planes.splice(+el.dataset.planDel,1); renderProductoForm();
+  }));
+  document.getElementById('p_addPlan').addEventListener('click', ()=>{
+    d.planes.push({nombre:'', precio:0, features:['']}); renderProductoForm();
+  });
 }
 
 /* =========================================================
@@ -2252,7 +2450,7 @@ function RENDER_FACTURAS(){
               <tr>
                 <td class="cell-strong">${escapeHtml(clienteNombre(f.clienteId))}</td>
                 <td class="cell-dim">${escapeHtml(f.concepto)}</td>
-                <td><span class="tag-product ${productTagClass(f.producto)}">${productLabel(f.producto)}</span></td>
+                <td>${productoTagHtml(f.producto)}</td>
                 <td class="cell-dim">${formatDate(f.fechaEmision)}</td>
                 <td class="cell-dim">${formatDate(f.fechaVenc)}</td>
                 <td class="cell-strong">${formatCOP(f.monto)}</td>
@@ -2283,18 +2481,14 @@ function RENDER_FACTURAS(){
 
 function openFacturaModal(id){
   const editing = !!id;
-  const f = editing ? STATE.facturas.find(f=>f.id===id) : {clienteId:'', producto:'agendamiento', concepto:'', monto:0, fechaEmision:todayISO(), fechaVenc:addDays(15), estado:'Pendiente'};
+  const f = editing ? STATE.facturas.find(f=>f.id===id) : {clienteId:'', producto:defaultProductoSlug(), concepto:'', monto:0, fechaEmision:todayISO(), fechaVenc:addDays(15), estado:'Pendiente'};
   const clienteOptions = STATE.clientes.map(c=>`<option value="${c.id}" ${f.clienteId===c.id?'selected':''}>${escapeHtml(c.nombre)}</option>`).join('');
   openModal(editing?'Editar factura':'Nueva factura', `
     <div class="form-group"><label>Cliente</label><select id="f_cliente"><option value="">Selecciona...</option>${clienteOptions}</select></div>
     <div class="form-group"><label>Concepto</label><input id="f_concepto" value="${escapeHtml(f.concepto)}" placeholder="Ej: Suscripción mensual - Profesional"></div>
     <div class="form-row">
       <div class="form-group"><label>Producto</label>
-        <select id="f_producto">
-          <option value="agendamiento" ${f.producto==='agendamiento'?'selected':''}>Agendamiento de citas</option>
-          <option value="excel-bi" ${f.producto==='excel-bi'?'selected':''}>Clases Excel & Power BI</option>
-          <option value="ambos" ${f.producto==='ambos'?'selected':''}>Ambos productos</option>
-        </select>
+        <select id="f_producto">${productoSelectOptionsHtml(f.producto)}</select>
       </div>
       <div class="form-group"><label>Monto (COP)</label><input id="f_monto" type="number" min="0" step="1000" value="${f.monto||0}"></div>
     </div>
@@ -2455,11 +2649,9 @@ function RENDER_REPORTES(){
   const maxIngreso = Math.max(1, ...ingresosPorMes.map(m=>m.total));
 
   // clientes por producto
-  const productKeys = [
-    {key:'agendamiento', label:'Agendamiento', color:'#5b5ff2'},
-    {key:'excel-bi', label:'Excel & Power BI', color:'#17c3b2'},
-    {key:'ambos', label:'Ambos', color:'#ff9f5b'},
-  ];
+  const productKeys = STATE.productos.map(p=>({
+    key: p.slug, label: p.etiqueta || p.nombre, color: (COLOR_PALETTE[p.color] || COLOR_PALETTE.gris).fg,
+  })).filter(p=>STATE.clientes.some(c=>c.producto===p.key));
   const totalClientes = STATE.clientes.length || 1;
   let accP=0;
   const gradientProd = productKeys.map(p=>{
@@ -2553,22 +2745,6 @@ function RENDER_CONFIG(){
       <button class="btn btn-primary" id="saveConfig">${ICONS.check} Guardar cambios</button>
     </div>
     <div class="card" style="max-width:520px;margin-top:18px;">
-      <div class="card-title">Plantillas de documentos</div>
-      <p style="font-size:12.5px;color:var(--text-dim);margin:0 0 14px;">Sube el archivo de plantilla (PDF o Word) que quieres usar como referencia para tus cotizaciones y facturas.</p>
-      <div class="form-group">
-        <label>Plantilla de Cotización</label>
-        ${STATE.config.plantillaCotizacionNombre ? `<div style="margin-bottom:8px;font-size:12.5px;">Archivo actual: <a href="${STATE.config.plantillaCotizacionUrl}" target="_blank" rel="noopener">${escapeHtml(STATE.config.plantillaCotizacionNombre)}</a></div>` : ''}
-        <input type="file" id="fileCotizacionPlantilla" accept=".pdf,.doc,.docx">
-        <button class="btn btn-outline" id="uploadCotizacionPlantilla" style="margin-top:8px;">${ICONS.check} Subir plantilla</button>
-      </div>
-      <div class="form-group" style="margin-top:18px;">
-        <label>Plantilla de Factura</label>
-        ${STATE.config.plantillaFacturaNombre ? `<div style="margin-bottom:8px;font-size:12.5px;">Archivo actual: <a href="${STATE.config.plantillaFacturaUrl}" target="_blank" rel="noopener">${escapeHtml(STATE.config.plantillaFacturaNombre)}</a></div>` : ''}
-        <input type="file" id="fileFacturaPlantilla" accept=".pdf,.doc,.docx">
-        <button class="btn btn-outline" id="uploadFacturaPlantilla" style="margin-top:8px;">${ICONS.check} Subir plantilla</button>
-      </div>
-    </div>
-    <div class="card" style="max-width:520px;margin-top:18px;">
       <div class="card-title">Datos en la nube (Supabase)</div>
       <p style="font-size:12.5px;color:var(--text-dim);line-height:1.6;">
         Toda la información de este panel (clientes, ventas, facturas, agenda y cotizaciones) se guarda en tu
@@ -2616,20 +2792,6 @@ function RENDER_CONFIG(){
     STATE.config.empresa = empresa;
     document.getElementById('companyNameLabel').textContent = STATE.config.empresa;
     toast('Configuración guardada');
-  };
-  document.getElementById('uploadCotizacionPlantilla').onclick = async ()=>{
-    const input = document.getElementById('fileCotizacionPlantilla');
-    const file = input.files[0];
-    if(!file){ toast('Selecciona un archivo primero'); return; }
-    await uploadPlantilla('cotizacion', file);
-    RENDER_CONFIG();
-  };
-  document.getElementById('uploadFacturaPlantilla').onclick = async ()=>{
-    const input = document.getElementById('fileFacturaPlantilla');
-    const file = input.files[0];
-    if(!file){ toast('Selecciona un archivo primero'); return; }
-    await uploadPlantilla('factura', file);
-    RENDER_CONFIG();
   };
   document.getElementById('exportBtn').onclick = ()=>{
     const blob = new Blob([JSON.stringify(STATE, null, 2)], {type:'application/json'});
