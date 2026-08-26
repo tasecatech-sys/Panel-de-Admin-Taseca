@@ -2279,8 +2279,22 @@ function renderPlanHorarios(){
   }
 
   const franjas = [...STATE.horarios].sort((a,b)=> (a.fecha+a.hora).localeCompare(b.fecha+b.hora));
+  const agendadas = STATE.horarios
+    .filter(f=>f.estado!=='libre' && daysBetween(f.fecha)>=0)
+    .sort((a,b)=> (a.fecha+a.hora).localeCompare(b.fecha+b.hora));
 
   document.getElementById('planEstudioBody').innerHTML = `
+    <div class="card" style="margin-bottom:18px;">
+      <div class="card-title">Clases agendadas próximas <small>${agendadas.length}</small></div>
+      ${agendadas.length ? agendadas.map(f=>`
+        <div class="upcoming-item">
+          <div class="upcoming-date"><div class="d">${new Date(f.fecha+'T00:00:00').getDate()}</div><div class="m">${new Date(f.fecha+'T00:00:00').toLocaleDateString('es-CO',{month:'short'})}</div></div>
+          <div class="upcoming-info" style="flex:1;">
+            <div class="t">${escapeHtml(clienteNombre(f.clienteId))} <span class="tag-product ${f.plataforma==='excel'?'tag-excel':'tag-agenda'}" style="margin-left:6px;">${PLAT_LABEL_ESTUDIO[f.plataforma]}</span></div>
+            <div class="s">${f.hora} · ${f.modalidad} · ${f.duracion} min${f.profesor ? ' · '+escapeHtml(f.profesor) : ''}</div>
+          </div>
+        </div>`).join('') : `<div class="empty-state">${ICONS.empty}<div>No hay clases agendadas próximas</div></div>`}
+    </div>
     <div class="grid grid-2">
       <div class="card">
         <div class="qe-section-title"><span class="num">1</span>Habilitar horarios</div>
