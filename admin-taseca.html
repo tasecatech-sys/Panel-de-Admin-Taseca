@@ -397,6 +397,27 @@ select.filter, input.filter{
 .auth-loading{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:400;font-size:13px;color:var(--text-dim);}
 .auth-loading.hidden{display:none;}
 #appShell.hidden{display:none;}
+
+/* ---------- calendario de agenda ---------- */
+.cal-nav{display:flex;align-items:center;gap:6px;}
+.cal-nav-label{font-size:14px;font-weight:700;text-transform:capitalize;min-width:150px;text-align:center;}
+.cal-nav .icon-btn svg{width:16px;height:16px;}
+.cal-nav .icon-btn.next svg{transform:scaleX(-1);}
+.cal-grid{display:grid;grid-template-columns:repeat(7,1fr);}
+.cal-grid-head{margin-bottom:4px;}
+.cal-head-cell{padding:6px 4px;font-size:11.5px;font-weight:700;color:var(--text-dim);text-align:center;text-transform:uppercase;letter-spacing:.03em;}
+.cal-grid:not(.cal-grid-head){border-top:1px solid var(--border);border-left:1px solid var(--border);}
+.cal-cell{min-height:104px;border-right:1px solid var(--border);border-bottom:1px solid var(--border);padding:6px;cursor:pointer;display:flex;flex-direction:column;gap:4px;}
+.cal-cell:hover{background:var(--panel-2);}
+.cal-cell-muted{background:var(--panel-2);opacity:.55;}
+.cal-cell-today .cal-daynum{background:var(--accent);color:#fff;}
+.cal-daynum{font-size:12px;font-weight:700;color:var(--text-dim);width:22px;height:22px;border-radius:50%;display:flex;align-items:center;justify-content:center;}
+.cal-cell-today .cal-daynum{color:#fff;}
+.cal-events{display:flex;flex-direction:column;gap:3px;overflow-y:auto;max-height:78px;}
+.cal-event{border-radius:6px;padding:2px 6px;font-size:11px;font-weight:600;line-height:1.5;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.cal-event:hover{filter:brightness(.95);}
+.cal-event-time{font-weight:800;margin-right:3px;}
+@media(max-width:820px){.cal-cell{min-height:64px;}.cal-events{max-height:38px;}.cal-nav-label{min-width:110px;font-size:12.5px;}}
 </style>
 </head>
 <body>
@@ -2542,53 +2563,84 @@ function openFacturaModal(id){
 }
 
 /* =========================================================
-   AGENDA
+   AGENDA (vista calendario)
 ========================================================= */
+let AGENDA_CAL = null; // {y, m} mes 0-indexado que se está mostrando
+
+function isoFromParts(y, m, d){
+  return y + '-' + String(m+1).padStart(2,'0') + '-' + String(d).padStart(2,'0');
+}
+
 function RENDER_AGENDA(){
-  const rows = [...STATE.agenda].sort((a,b)=> (a.fecha+a.hora).localeCompare(b.fecha+b.hora));
+  const now = new Date();
+  if(!AGENDA_CAL) AGENDA_CAL = { y: now.getFullYear(), m: now.getMonth() };
+  const { y, m } = AGENDA_CAL;
+
+  const eventsByDate = {};
+  STATE.agenda.forEach(a=>{ (eventsByDate[a.fecha] = eventsByDate[a.fecha] || []).push(a); });
+  Object.values(eventsByDate).forEach(list=>list.sort((x,z)=>x.hora.localeCompare(z.hora)));
+
+  const first = new Date(y, m, 1);
+  const startOffset = first.getDay();
+  const daysInMonth = new Date(y, m+1, 0).getDate();
+  const daysInPrevMonth = new Date(y, m, 0).getDate();
+  const totalCells = Math.ceil((startOffset + daysInMonth) / 7) * 7;
+  const monthLabel = first.toLocaleDateString('es-CO', {month:'long', year:'numeric'});
+  const todayIso = todayISO();
+
+  let cellsHtml = '';
+  for(let i=0;i<totalCells;i++){
+    const dayNum = i - startOffset + 1;
+    let cy=y, cm=m, cd=dayNum, otherMonth=false;
+    if(dayNum < 1){ cm = m-1; cd = daysInPrevMonth + dayNum; otherMonth = true; if(cm<0){cm=11; cy=y-1;} }
+    else if(dayNum > daysInMonth){ cm = m+1; cd = dayNum - daysInMonth; otherMonth = true; if(cm>11){cm=0; cy=y+1;} }
+    const iso = isoFromParts(cy, cm, cd);
+    const events = eventsByDate[iso] || [];
+    cellsHtml += `<div class="cal-cell ${otherMonth?'cal-cell-muted':''} ${iso===todayIso?'cal-cell-today':''}" data-date="${iso}">
+      <div class="cal-daynum">${cd}</div>
+      <div class="cal-events">
+        ${events.map(ev=>`<div class="cal-event ${estadoBadge(ev.estado)}" data-agenda-id="${ev.id}" title="${escapeHtml(ev.hora+' · '+ev.tipo+' · '+clienteNombre(ev.clienteId))}"><span class="cal-event-time">${ev.hora}</span>${escapeHtml(ev.tipo)}</div>`).join('')}
+      </div>
+    </div>`;
+  }
+
   document.getElementById('view').innerHTML = `
     <div class="card">
       <div class="toolbar">
-        <div style="font-size:13px;font-weight:700;">Próximas clases, demos y citas</div>
-        <div style="font-size:12.5px;color:var(--text-dim);">${rows.length} eventos</div>
+        <div class="cal-nav">
+          <button class="icon-btn" id="cal_prev">${ICONS.arrowLeft}</button>
+          <div class="cal-nav-label">${monthLabel}</div>
+          <button class="icon-btn next" id="cal_next">${ICONS.arrowLeft}</button>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <button class="btn btn-outline" id="cal_today">Hoy</button>
+          <div style="font-size:12.5px;color:var(--text-dim);">${STATE.agenda.length} eventos</div>
+          <button class="btn btn-primary" id="cal_new">${ICONS.plus} Nuevo evento</button>
+        </div>
       </div>
-      <div class="table-wrap">
-        <table>
-          <thead><tr><th>Fecha</th><th>Hora</th><th>Tipo</th><th>Cliente</th><th>Modalidad</th><th>Estado</th><th></th></tr></thead>
-          <tbody>
-            ${rows.length ? rows.map(a=>`
-              <tr>
-                <td class="cell-strong">${formatDate(a.fecha)}</td>
-                <td class="cell-dim">${a.hora}</td>
-                <td>${escapeHtml(a.tipo)}</td>
-                <td>${escapeHtml(clienteNombre(a.clienteId))}</td>
-                <td class="cell-dim">${a.modalidad}</td>
-                <td><span class="badge ${estadoBadge(a.estado)}"><span class="badge-dot"></span>${a.estado}</span></td>
-                <td>
-                  <div class="row-actions">
-                    <button class="icon-btn" data-edit="${a.id}">${ICONS.edit}</button>
-                    <button class="icon-btn danger" data-del="${a.id}">${ICONS.trash}</button>
-                  </div>
-                </td>
-              </tr>`).join('') : `<tr><td colspan="7"><div class="empty-state">${ICONS.empty}<div>No hay eventos programados</div></div></td></tr>`}
-          </tbody>
-        </table>
+      <div class="cal-grid cal-grid-head">
+        ${['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'].map(d=>`<div class="cal-head-cell">${d}</div>`).join('')}
       </div>
+      <div class="cal-grid">${cellsHtml}</div>
     </div>
   `;
-  document.querySelectorAll('[data-edit]').forEach(b=>b.addEventListener('click', ()=>openAgendaModal(b.dataset.edit)));
-  document.querySelectorAll('[data-del]').forEach(b=>b.addEventListener('click', ()=>{
-    confirmDialog('¿Eliminar este evento de la agenda?', async ()=>{
-      await dbDelete('agenda', b.dataset.del);
-      STATE.agenda = STATE.agenda.filter(x=>x.id!==b.dataset.del);
-      RENDER_AGENDA(); toast('Evento eliminado');
-    });
-  }));
+
+  document.getElementById('cal_prev').onclick = ()=>{ AGENDA_CAL.m--; if(AGENDA_CAL.m<0){AGENDA_CAL.m=11; AGENDA_CAL.y--;} RENDER_AGENDA(); };
+  document.getElementById('cal_next').onclick = ()=>{ AGENDA_CAL.m++; if(AGENDA_CAL.m>11){AGENDA_CAL.m=0; AGENDA_CAL.y++;} RENDER_AGENDA(); };
+  document.getElementById('cal_today').onclick = ()=>{ const n=new Date(); AGENDA_CAL={y:n.getFullYear(),m:n.getMonth()}; RENDER_AGENDA(); };
+  document.getElementById('cal_new').onclick = ()=>openAgendaModal(null, todayIso);
+
+  document.querySelectorAll('.cal-cell').forEach(el=>{
+    el.addEventListener('click', ()=>openAgendaModal(null, el.dataset.date));
+  });
+  document.querySelectorAll('.cal-event').forEach(el=>{
+    el.addEventListener('click', (e)=>{ e.stopPropagation(); openAgendaModal(el.dataset.agendaId); });
+  });
 }
 
-function openAgendaModal(id){
+function openAgendaModal(id, fechaDefault){
   const editing = !!id;
-  const a = editing ? STATE.agenda.find(a=>a.id===id) : {clienteId:'', tipo:'Clase Excel', fecha:todayISO(), hora:'10:00', duracion:'45 min', modalidad:'Virtual', estado:'Programada', notas:''};
+  const a = editing ? STATE.agenda.find(a=>a.id===id) : {clienteId:'', tipo:'Clase Excel', fecha:fechaDefault||todayISO(), hora:'10:00', duracion:'45 min', modalidad:'Virtual', estado:'Programada', notas:''};
   const clienteOptions = STATE.clientes.map(c=>`<option value="${c.id}" ${a.clienteId===c.id?'selected':''}>${escapeHtml(c.nombre)}</option>`).join('');
   openModal(editing?'Editar evento':'Nuevo evento de agenda', `
     <div class="form-group"><label>Cliente</label><select id="f_cliente"><option value="">Selecciona...</option>${clienteOptions}</select></div>
@@ -2621,10 +2673,21 @@ function openAgendaModal(id){
     </div>
     <div class="form-group"><label>Notas</label><textarea id="f_notas">${escapeHtml(a.notas||'')}</textarea></div>
   `, `
+    ${editing ? `<button class="btn btn-outline" id="deleteBtn" style="color:var(--danger);margin-right:auto;">${ICONS.trash} Eliminar</button>` : ''}
     <button class="btn btn-outline" id="cancelBtn">Cancelar</button>
     <button class="btn btn-primary" id="saveBtn">${ICONS.check} Guardar</button>
   `);
   document.getElementById('cancelBtn').onclick = closeModal;
+  if(editing){
+    document.getElementById('deleteBtn').onclick = ()=>{
+      confirmDialog('¿Eliminar este evento de la agenda?', async ()=>{
+        await dbDelete('agenda', a.id);
+        STATE.agenda = STATE.agenda.filter(x=>x.id!==a.id);
+        RENDER_AGENDA(); toast('Evento eliminado');
+        if(CURRENT_VIEW==='dashboard') RENDER_DASHBOARD();
+      });
+    };
+  }
   document.getElementById('saveBtn').onclick = async ()=>{
     const clienteId = document.getElementById('f_cliente').value;
     if(!clienteId){ toast('Selecciona un cliente'); return; }
