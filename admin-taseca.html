@@ -2305,6 +2305,7 @@ function renderPlanHorarios(){
   const agendadas = STATE.horarios
     .filter(f=>f.estado!=='libre' && daysBetween(f.fecha)>=0)
     .sort((a,b)=> (a.fecha+a.hora).localeCompare(b.fecha+b.hora));
+  const horariosCalHtml = horariosCalCellsHtml(franjas); // fija HO_CAL_LABEL antes de usarla abajo
 
   document.getElementById('planEstudioBody').innerHTML = `
     <div class="card" style="margin-bottom:18px;">
@@ -2361,23 +2362,22 @@ function renderPlanHorarios(){
       </div>
 
       <div class="card">
-        <div class="qe-section-title"><span class="num">2</span>Franjas creadas <small style="margin-left:auto;">${franjas.length}</small></div>
-        <div class="table-wrap" style="max-height:480px;overflow-y:auto;">
-          <table>
-            <thead><tr><th>Fecha</th><th>Hora</th><th>Plataforma</th><th>Estado</th><th></th></tr></thead>
-            <tbody>
-              ${franjas.length ? franjas.map(f=>`
-                <tr>
-                  <td class="cell-strong">${formatDate(f.fecha)}</td>
-                  <td class="cell-dim">${f.hora}</td>
-                  <td><span class="tag-product ${f.plataforma==='excel'?'tag-excel':'tag-agenda'}">${PLAT_LABEL_ESTUDIO[f.plataforma]}</span></td>
-                  <td>${f.estado==='libre'
-                      ? `<span class="badge badge-blue"><span class="badge-dot"></span>Libre</span>`
-                      : `<span class="badge badge-green"><span class="badge-dot"></span>${escapeHtml(clienteNombre(f.clienteId))}</span>`}</td>
-                  <td>${f.estado==='libre' ? `<button class="icon-btn danger" data-del-franja="${f.id}">${ICONS.trash}</button>` : ''}</td>
-                </tr>`).join('') : `<tr><td colspan="5"><div class="empty-state">${ICONS.empty}<div>Aún no has creado horarios</div></div></td></tr>`}
-            </tbody>
-          </table>
+        <div class="qe-section-title" style="margin-bottom:12px;"><span class="num">2</span>Disponibilidad <small style="margin-left:auto;">${franjas.length} franjas</small></div>
+        <div class="toolbar" style="margin-bottom:12px;">
+          <div class="cal-nav">
+            <button class="icon-btn" id="ho_cal_prev">${ICONS.arrowLeft}</button>
+            <div class="cal-nav-label">${HO_CAL_LABEL}</div>
+            <button class="icon-btn next" id="ho_cal_next">${ICONS.arrowLeft}</button>
+          </div>
+          <button class="btn btn-outline btn-sm" id="ho_cal_today">Hoy</button>
+        </div>
+        <div class="cal-grid cal-grid-head">
+          ${['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'].map(d=>`<div class="cal-head-cell">${d}</div>`).join('')}
+        </div>
+        <div class="cal-grid">${horariosCalHtml}</div>
+        <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;font-size:11.5px;color:var(--text-dim);">
+          <span style="display:flex;align-items:center;gap:5px;"><span style="width:9px;height:9px;border-radius:3px;background:#eaeaff;display:inline-block;"></span>Libre</span>
+          <span style="display:flex;align-items:center;gap:5px;"><span style="width:9px;height:9px;border-radius:3px;background:#e4f8ee;display:inline-block;"></span>Reservada</span>
         </div>
       </div>
     </div>
@@ -2390,11 +2390,87 @@ function renderPlanHorarios(){
     if(v && !horariosFechasNuevas.includes(v)){ horariosFechasNuevas.push(v); renderFechasList(); }
   };
   document.getElementById('ho_generar').onclick = generarFranjasUI;
+
+  document.getElementById('ho_cal_prev').onclick = ()=>{ HO_CAL.m--; if(HO_CAL.m<0){HO_CAL.m=11; HO_CAL.y--;} renderPlanHorarios(); };
+  document.getElementById('ho_cal_next').onclick = ()=>{ HO_CAL.m++; if(HO_CAL.m>11){HO_CAL.m=0; HO_CAL.y++;} renderPlanHorarios(); };
+  document.getElementById('ho_cal_today').onclick = ()=>{ const n=new Date(); HO_CAL={y:n.getFullYear(),m:n.getMonth()}; renderPlanHorarios(); };
+  document.querySelectorAll('.cal-cell[data-date]').forEach(el=>{
+    el.addEventListener('click', ()=>openFranjaDayModal(el.dataset.date));
+  });
+}
+
+let HO_CAL = null;
+const HO_CAL_LABEL_FMT = d => d.toLocaleDateString('es-CO', {month:'long', year:'numeric'});
+let HO_CAL_LABEL = '';
+
+function horariosCalCellsHtml(franjas){
+  const now = new Date();
+  if(!HO_CAL) HO_CAL = { y: now.getFullYear(), m: now.getMonth() };
+  const { y, m } = HO_CAL;
+
+  const porFecha = {};
+  franjas.forEach(f=>{ (porFecha[f.fecha] = porFecha[f.fecha] || []).push(f); });
+
+  const first = new Date(y, m, 1);
+  const startOffset = first.getDay();
+  const daysInMonth = new Date(y, m+1, 0).getDate();
+  const daysInPrevMonth = new Date(y, m, 0).getDate();
+  const totalCells = Math.ceil((startOffset + daysInMonth) / 7) * 7;
+  HO_CAL_LABEL = HO_CAL_LABEL_FMT(first);
+  const todayIso = todayISO();
+
+  let html = '';
+  for(let i=0;i<totalCells;i++){
+    const dayNum = i - startOffset + 1;
+    let cy=y, cm=m, cd=dayNum, otherMonth=false;
+    if(dayNum < 1){ cm = m-1; cd = daysInPrevMonth + dayNum; otherMonth = true; if(cm<0){cm=11; cy=y-1;} }
+    else if(dayNum > daysInMonth){ cm = m+1; cd = dayNum - daysInMonth; otherMonth = true; if(cm>11){cm=0; cy=y+1;} }
+    const iso = isoFromParts(cy, cm, cd);
+    const dia = (porFecha[iso] || []).sort((a,b)=>a.hora.localeCompare(b.hora));
+    html += `<div class="cal-cell ${otherMonth?'cal-cell-muted':''} ${iso===todayIso?'cal-cell-today':''}" data-date="${iso}">
+      <div class="cal-daynum">${cd}</div>
+      <div class="cal-events">
+        ${dia.map(f=>`<div class="cal-event ${f.estado==='libre'?'badge-blue':'badge-green'}" title="${escapeHtml(f.hora+' · '+PLAT_LABEL_ESTUDIO[f.plataforma]+' · '+(f.estado==='libre'?'Libre':clienteNombre(f.clienteId)))}">${f.hora} ${PLAT_LABEL_ESTUDIO[f.plataforma]}</div>`).join('')}
+      </div>
+    </div>`;
+  }
+  return html;
+}
+
+function openFranjaDayModal(iso){
+  const dia = STATE.horarios.filter(f=>f.fecha===iso).sort((a,b)=>a.hora.localeCompare(b.hora));
+  const d = new Date(iso+'T00:00:00');
+  const label = d.toLocaleDateString('es-CO', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+  openModal(label.charAt(0).toUpperCase()+label.slice(1), `
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      ${dia.length ? dia.map(f=>`
+        <div class="day-event-row" style="cursor:default;">
+          <div>
+            <div style="font-weight:700;font-size:13.5px;">${f.hora} · ${PLAT_LABEL_ESTUDIO[f.plataforma]}</div>
+            <div style="font-size:12px;color:var(--text-dim);margin-top:2px;">${f.modalidad} · ${f.duracion} min${f.profesor?' · '+escapeHtml(f.profesor):''}</div>
+          </div>
+          ${f.estado==='libre'
+            ? `<div style="display:flex;align-items:center;gap:10px;"><span class="badge badge-blue"><span class="badge-dot"></span>Libre</span><button class="icon-btn danger" data-del-franja="${f.id}">${ICONS.trash}</button></div>`
+            : `<span class="badge badge-green"><span class="badge-dot"></span>${escapeHtml(clienteNombre(f.clienteId))}</span>`}
+        </div>
+      `).join('') : `<div class="empty-state">${ICONS.empty}<div>No hay horarios este día</div></div>`}
+    </div>
+  `, `
+    <button class="btn btn-outline" id="cancelBtn">Cerrar</button>
+    <button class="btn btn-primary" id="addDayFranjaBtn">${ICONS.plus} Agregar horario este día</button>
+  `);
+  document.getElementById('cancelBtn').onclick = closeModal;
+  document.getElementById('addDayFranjaBtn').onclick = ()=>{
+    closeModal();
+    if(!horariosFechasNuevas.includes(iso)){ horariosFechasNuevas.push(iso); renderFechasList(); }
+    document.getElementById('ho_fecha').value = iso;
+    document.getElementById('ho_desde').scrollIntoView({behavior:'smooth', block:'center'});
+  };
   document.querySelectorAll('[data-del-franja]').forEach(b=>b.addEventListener('click', ()=>{
     confirmDialog('¿Eliminar esta franja libre?', async ()=>{
       await dbDelete('horarios', b.dataset.delFranja);
       STATE.horarios = STATE.horarios.filter(x=>x.id!==b.dataset.delFranja);
-      renderPlanHorarios(); toast('Franja eliminada');
+      closeModal(); renderPlanHorarios(); toast('Franja eliminada');
     });
   }));
 }
