@@ -418,6 +418,8 @@ select.filter, input.filter{
 .cal-event:hover{filter:brightness(.95);}
 .cal-event-time{font-weight:800;margin-right:3px;}
 @media(max-width:820px){.cal-cell{min-height:64px;}.cal-events{max-height:38px;}.cal-nav-label{min-width:110px;font-size:12.5px;}}
+.day-event-row{border:1px solid var(--border);border-radius:10px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;cursor:pointer;background:var(--panel);}
+.day-event-row:hover{background:var(--panel-2);border-color:#c9cdf5;}
 </style>
 </head>
 <body>
@@ -2631,10 +2633,37 @@ function RENDER_AGENDA(){
   document.getElementById('cal_new').onclick = ()=>openAgendaModal(null, todayIso);
 
   document.querySelectorAll('.cal-cell').forEach(el=>{
-    el.addEventListener('click', ()=>openAgendaModal(null, el.dataset.date));
+    el.addEventListener('click', ()=>openDayModal(el.dataset.date));
   });
   document.querySelectorAll('.cal-event').forEach(el=>{
     el.addEventListener('click', (e)=>{ e.stopPropagation(); openAgendaModal(el.dataset.agendaId); });
+  });
+}
+
+function openDayModal(iso){
+  const events = STATE.agenda.filter(a=>a.fecha===iso).sort((a,b)=>a.hora.localeCompare(b.hora));
+  const d = new Date(iso+'T00:00:00');
+  const label = d.toLocaleDateString('es-CO', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
+  openModal(label.charAt(0).toUpperCase()+label.slice(1), `
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      ${events.length ? events.map(a=>`
+        <div class="day-event-row" data-agenda-id="${a.id}">
+          <div>
+            <div style="font-weight:700;font-size:13.5px;">${a.hora} · ${escapeHtml(a.tipo)}</div>
+            <div style="font-size:12px;color:var(--text-dim);margin-top:2px;">${escapeHtml(clienteNombre(a.clienteId))} · ${escapeHtml(a.modalidad)}</div>
+          </div>
+          <span class="badge ${estadoBadge(a.estado)}"><span class="badge-dot"></span>${a.estado}</span>
+        </div>
+      `).join('') : `<div class="empty-state">${ICONS.empty}<div>No hay eventos este día</div></div>`}
+    </div>
+  `, `
+    <button class="btn btn-outline" id="cancelBtn">Cerrar</button>
+    <button class="btn btn-primary" id="addDayBtn">${ICONS.plus} Nuevo evento</button>
+  `);
+  document.getElementById('cancelBtn').onclick = closeModal;
+  document.getElementById('addDayBtn').onclick = ()=>openAgendaModal(null, iso);
+  document.querySelectorAll('[data-agenda-id]').forEach(el=>{
+    el.addEventListener('click', ()=>openAgendaModal(el.dataset.agendaId));
   });
 }
 

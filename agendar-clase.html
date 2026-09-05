@@ -99,6 +99,16 @@ linear-gradient(160deg,#12172b,#1b2140);
 <div class="card" id="formCard">
 <div class="msg" id="formMsg"></div>
 
+<div id="verifyStep">
+<div class="step-title">Verifica tu documento</div>
+<p style="font-size:12.5px;color:var(--text-dim);margin:0 0 14px;line-height:1.5;">Escribe tu n&uacute;mero de documento para agendar. Solo pueden agendar estudiantes ya registrados por Taseca; si a&uacute;n no tienes cuenta, escr&iacute;benos primero para crearla.</p>
+<div class="form-group"><label>N&uacute;mero de documento (CC)</label><input id="v_documento" inputmode="numeric" placeholder="Ej: 1000000000"></div>
+<button type="button" class="btn-submit" id="btnVerificar">Continuar</button>
+</div>
+
+<div id="bookingSteps" style="display:none;">
+<div id="studentCard"></div>
+
 <div class="step-title">1. &iquest;Qu&eacute; clase quieres?</div>
 <div class="class-options">
 <div class="class-opt" data-plat="excel">
@@ -117,15 +127,11 @@ linear-gradient(160deg,#12172b,#1b2140);
 </div>
 
 <form id="claseForm" style="display:none;margin-top:22px;">
-<div class="step-title">3. Tus datos</div>
-<div class="form-group"><label>Nombre completo</label><input type="text" id="f_nombre" required placeholder="Tu nombre"></div>
-<div class="form-row">
-<div class="form-group"><label>Correo</label><input type="email" id="f_email" required placeholder="tucorreo@ejemplo.com"></div>
-<div class="form-group"><label>Tel&eacute;fono</label><input type="tel" id="f_telefono" placeholder="300 000 0000"></div>
-</div>
+<div class="step-title">3. Confirma tu reserva</div>
 <div class="form-group"><label>&iquest;Qu&eacute; te gustar&iacute;a automatizar? (opcional)</label><textarea id="f_notas" placeholder="Ej: quiero automatizar el informe mensual de ventas..."></textarea></div>
 <button type="submit" class="btn-submit" id="submitBtn">Confirmar clase</button>
 </form>
+</div>
 </div>
 
 <div class="footer-note">Taseca Software &middot; The All-Seeing Eye Consulting Analytics</div>
@@ -199,12 +205,47 @@ return `${dias[d.getDay()]} ${d.getDate()} ${meses[d.getMonth()]}`;
 
 let plataforma = null;
 let franjaSeleccionada = null;
+let estudianteVerificado = null;
 
 function showMsg(text, type){
 const el = document.getElementById('formMsg');
 el.textContent = text;
 el.className = 'msg show ' + type;
 }
+
+async function verificarDocumento(){
+const doc = document.getElementById('v_documento').value.trim();
+if(!doc){ showMsg('Escribe tu número de documento.', 'error'); return; }
+
+const btn = document.getElementById('btnVerificar');
+btn.disabled = true; btn.textContent = 'Verificando...';
+
+const { data, error } = await sb.rpc('buscar_estudiante_por_documento', { p_documento: doc });
+
+btn.disabled = false; btn.textContent = 'Continuar';
+
+if(error || !data || data.ok === false){
+showMsg((data && data.error) || 'No pudimos verificar tu documento. Intenta de nuevo.', 'error');
+return;
+}
+
+estudianteVerificado = { documento: doc, nombre: data.nombre, email: data.email, telefono: data.telefono };
+
+document.getElementById('formMsg').className = 'msg';
+document.getElementById('verifyStep').style.display = 'none';
+document.getElementById('bookingSteps').style.display = 'block';
+document.getElementById('studentCard').innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;gap:10px;background:#f1f1ff;border-radius:11px;padding:12px 14px;margin-bottom:22px;"><div><div style="font-weight:700;font-size:13.5px;">' + esc(data.nombre) + '</div><div style="font-size:12px;color:var(--text-dim);margin-top:2px;">' + esc(data.email||'') + (data.telefono ? ' &middot; ' + esc(data.telefono) : '') + '</div></div><button type="button" id="btnCambiarDoc" style="background:none;border:none;color:var(--accent);font-size:12px;font-weight:700;cursor:pointer;">Cambiar</button></div>';
+
+document.getElementById('btnCambiarDoc').addEventListener('click', ()=>{
+estudianteVerificado = null;
+document.getElementById('bookingSteps').style.display = 'none';
+document.getElementById('verifyStep').style.display = 'block';
+document.getElementById('v_documento').value = '';
+});
+}
+
+document.getElementById('btnVerificar').addEventListener('click', verificarDocumento);
+document.getElementById('v_documento').addEventListener('keydown', e=>{ if(e.key==='Enter') verificarDocumento(); });
 
 document.querySelectorAll('.class-opt').forEach(el=>{
 el.addEventListener('click', ()=>{
@@ -256,18 +297,55 @@ document.getElementById('claseForm').style.display = 'block';
 });
 }
 
+// --- Notificaci\u00f3n obligatoria al profesor (correo + WhatsApp) ---
+// Correo: requiere desplegar la Edge Function "notificar-profesor"
+// (c\u00f3digo en supabase/functions/notificar-profesor/index.ts) y pegar
+// aqu\u00ed la URL que te da Supabase al desplegarla. Mientras esto est\u00e9
+// vac\u00edo, el correo simplemente no se env\u00eda (no rompe el agendamiento).
+const NOTIFY_FUNCTION_URL = ''; // Ej: 'https://xxxxxxxx.supabase.co/functions/v1/notificar-profesor'
+// WhatsApp: n\u00famero del profesor/negocio en formato internacional,
+// solo d\u00edgitos (c\u00f3digo de pa\u00eds + n\u00famero, sin '+' ni espacios).
+// Mientras esto est\u00e9 vac\u00edo, no se muestra el bot\u00f3n de WhatsApp.
+const PROFESOR_WHATSAPP = ''; // Ej: '573001234567'
+
+function notificarProfesor(reserva, estudiante){
+const detalle = 'Nueva clase agendada:\n' + estudiante.nombre + ' (CC ' + estudiante.documento + ')\n' +
+(reserva.plataforma === 'excel' ? 'Excel' : 'Power BI') + ' \u00b7 ' + fechaLarga(reserva.fecha) + ' a las ' + reserva.hora;
+
+if(NOTIFY_FUNCTION_URL && reserva.profesor){
+fetch(NOTIFY_FUNCTION_URL, {
+method: 'POST',
+headers: { 'Content-Type': 'application/json' },
+body: JSON.stringify({
+profesorEmail: reserva.profesor,
+estudianteNombre: estudiante.nombre,
+estudianteDocumento: estudiante.documento,
+plataforma: reserva.plataforma,
+fecha: reserva.fecha,
+hora: reserva.hora,
+}),
+}).catch(err => console.error('No se pudo notificar por correo:', err));
+}
+
+if(PROFESOR_WHATSAPP){
+const waUrl = 'https://wa.me/' + PROFESOR_WHATSAPP + '?text=' + encodeURIComponent(detalle);
+window.open(waUrl, '_blank');
+return waUrl;
+}
+return null;
+}
+
 document.getElementById('claseForm').addEventListener('submit', async (e)=>{
 e.preventDefault();
 if(!franjaSeleccionada){ showMsg('Selecciona un horario disponible.', 'error'); return; }
+if(!estudianteVerificado){ showMsg('Verifica tu documento primero.', 'error'); return; }
 
 const btn = document.getElementById('submitBtn');
 btn.disabled = true; btn.textContent = 'Confirmando...';
 
-const { data, error } = await sb.rpc('reservar_franja', {
+const { data, error } = await sb.rpc('reservar_franja_v2', {
 p_franja_id: franjaSeleccionada,
-p_nombre: document.getElementById('f_nombre').value.trim(),
-p_email: document.getElementById('f_email').value.trim(),
-p_telefono: document.getElementById('f_telefono').value.trim(),
+p_documento: estudianteVerificado.documento,
 p_notas: document.getElementById('f_notas').value.trim(),
 });
 
@@ -280,7 +358,9 @@ if(data && data.ok === false) cargarFranjas();
 return;
 }
 
-document.getElementById('formCard').innerHTML = '<div class="success-card"><div class="icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></div><h2>\u00a1Clase confirmada!</h2><p>Tu clase de <b>' + (data.plataforma === 'excel' ? 'Excel' : 'Power BI') + '</b> qued\u00f3 agendada para el <b>' + esc(fechaLarga(data.fecha)) + '</b> a las <b>' + esc(data.hora) + '</b>. Te contactaremos para confirmar los detalles.</p></div>';
+const waUrl = notificarProfesor(data, estudianteVerificado);
+
+document.getElementById('formCard').innerHTML = '<div class="success-card"><div class="icon"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 6 9 17l-5-5"/></svg></div><h2>\u00a1Clase confirmada!</h2><p>Tu clase de <b>' + (data.plataforma === 'excel' ? 'Excel' : 'Power BI') + '</b> qued\u00f3 agendada para el <b>' + esc(fechaLarga(data.fecha)) + '</b> a las <b>' + esc(data.hora) + '</b>. Te contactaremos para confirmar los detalles.</p>' + (waUrl ? '<a href="' + waUrl + '" target="_blank" rel="noopener" style="display:inline-block;margin-top:14px;background:#25D366;color:#fff;font-weight:700;font-size:13px;padding:10px 18px;border-radius:9px;text-decoration:none;">Avisar por WhatsApp</a>' : '') + '</div>';
 });
 
 const PLAT_LABEL = { excel:'Excel', powerbi:'Power BI' };
