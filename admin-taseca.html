@@ -3006,7 +3006,7 @@ async function renderStaffList(){
   if(!data.length){ box.innerHTML = '<p class="cell-dim" style="font-size:13px;">Aún no hay usuarios registrados.</p>'; return; }
 
   box.innerHTML = `<div class="table-wrap"><table>
-    <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>Estado</th><th></th></tr></thead>
+    <thead><tr><th>Nombre</th><th>Correo</th><th>Rol</th><th>WhatsApp</th><th>Estado</th><th></th></tr></thead>
     <tbody>${data.map(u=>{
       const isSelf = u.email === CURRENT_USER_EMAIL.toLowerCase();
       return `
@@ -3019,6 +3019,9 @@ async function renderStaffList(){
           </select>
         </td>
         <td>
+          <input class="filter" data-whatsapp-user="${escapeHtml(u.email)}" style="font-size:12px;width:130px;" value="${escapeHtml(u.whatsapp||'')}" placeholder="573001234567">
+        </td>
+        <td>
           <select class="estado-select ${u.activo?'badge-green':'badge-gray'}" data-activo-user="${escapeHtml(u.email)}" ${isSelf?'disabled':''}>
             <option value="true" ${u.activo?'selected':''}>Activo</option>
             <option value="false" ${!u.activo?'selected':''}>Inactivo</option>
@@ -3026,11 +3029,16 @@ async function renderStaffList(){
         </td>
         <td>${isSelf?'' : `<button class="icon-btn danger" data-del-user="${escapeHtml(u.email)}">${ICONS.trash}</button>`}</td>
       </tr>`;
-    }).join('')}</tbody></table></div>`;
+    }).join('')}</tbody></table></div>
+    <p style="font-size:11px;color:var(--text-dim);margin-top:10px;">El WhatsApp de cada profesor (solo dígitos, con código de país, ej. <code>573001234567</code>) se usa para avisarle cuando un estudiante agenda una clase con él.</p>`;
 
   box.querySelectorAll('[data-rol-user]').forEach(sel=>sel.addEventListener('change', async e=>{
     await sb.from('staff_usuarios').update({rol:e.target.value}).eq('email', sel.dataset.rolUser);
     toast('Rol actualizado'); renderStaffList();
+  }));
+  box.querySelectorAll('[data-whatsapp-user]').forEach(inp=>inp.addEventListener('change', async e=>{
+    await sb.from('staff_usuarios').update({whatsapp: e.target.value.trim()}).eq('email', inp.dataset.whatsappUser);
+    toast('WhatsApp actualizado');
   }));
   box.querySelectorAll('[data-activo-user]').forEach(sel=>sel.addEventListener('change', async e=>{
     await sb.from('staff_usuarios').update({activo: e.target.value==='true'}).eq('email', sel.dataset.activoUser);

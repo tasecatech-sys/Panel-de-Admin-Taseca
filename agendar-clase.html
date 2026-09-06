@@ -308,10 +308,10 @@ document.getElementById('claseForm').style.display = 'block';
 // aqu\u00ed la URL que te da Supabase al desplegarla. Mientras esto est\u00e9
 // vac\u00edo, el correo simplemente no se env\u00eda (no rompe el agendamiento).
 const NOTIFY_FUNCTION_URL = ''; // Ej: 'https://xxxxxxxx.supabase.co/functions/v1/notificar-profesor'
-// WhatsApp: n\u00famero del profesor/negocio en formato internacional,
-// solo d\u00edgitos (c\u00f3digo de pa\u00eds + n\u00famero, sin '+' ni espacios).
-// Mientras esto est\u00e9 vac\u00edo, no se muestra el bot\u00f3n de WhatsApp.
-const PROFESOR_WHATSAPP = ''; // Ej: '573001234567'
+// El WhatsApp ya no es un n\u00famero fijo aqu\u00ed: cada profesor tiene el
+// suyo guardado en el panel (Configuraci\u00f3n > Gesti\u00f3n de usuarios) y
+// reservar_franja_v2 lo devuelve como reserva.profesorWhatsapp. Si
+// ese profesor no tiene n\u00famero guardado, no se muestra el bot\u00f3n.
 
 function notificarProfesor(reserva, estudiante){
 const detalle = 'Nueva clase agendada:\n' + estudiante.nombre + ' (CC ' + estudiante.documento + ')\n' +
@@ -332,8 +332,8 @@ hora: reserva.hora,
 }).catch(err => console.error('No se pudo notificar por correo:', err));
 }
 
-if(PROFESOR_WHATSAPP){
-const waUrl = 'https://wa.me/' + PROFESOR_WHATSAPP + '?text=' + encodeURIComponent(detalle);
+if(reserva.profesorWhatsapp){
+const waUrl = 'https://wa.me/' + reserva.profesorWhatsapp + '?text=' + encodeURIComponent(detalle);
 window.open(waUrl, '_blank');
 return waUrl;
 }
@@ -357,7 +357,8 @@ p_notas: document.getElementById('f_notas').value.trim(),
 btn.disabled = false; btn.textContent = 'Confirmar clase';
 
 if(error || (data && data.ok === false)){
-const errMsg = (data && data.error) || 'No pudimos confirmar tu clase. Intenta de nuevo.';
+if(error) console.error('reservar_franja_v2:', error);
+const errMsg = (data && data.error) || (error && error.message) || 'No pudimos confirmar tu clase. Intenta de nuevo.';
 showMsg(errMsg, 'error');
 if(data && data.ok === false) cargarFranjas();
 return;
