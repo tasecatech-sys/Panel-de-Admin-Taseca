@@ -174,14 +174,19 @@ const SUPABASE_ANON_KEY = 'sb_publishable_71sDgXwdaGSomzG2U24vkw_1N4JWhF-';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const esc = s => String(s==null?'':s).replace(/[&<>"']/g, m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 
-document.querySelectorAll('.tabbtn').forEach(btn=>{
-btn.addEventListener('click', ()=>{
-document.querySelectorAll('.tabbtn').forEach(b=>b.classList.remove('active'));
-btn.classList.add('active');
+function activarTab(screen){
+document.querySelectorAll('.tabbtn').forEach(b=>b.classList.toggle('active', b.dataset.screen===screen));
 document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
-document.getElementById('screen-'+btn.dataset.screen).classList.add('active');
+document.getElementById('screen-'+screen).classList.add('active');
+}
+
+document.querySelectorAll('.tabbtn').forEach(btn=>{
+btn.addEventListener('click', ()=>activarTab(btn.dataset.screen));
 });
-});
+
+// Permite enlazar directo a la pestaña de avance, ej: agendar-clase.html#avance
+// (usado por el redirect de /mi-avance.html en vercel.json)
+if(location.hash === '#avance') activarTab('avance');
 
 const LOGO_SVG = `<svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
 <circle cx="60" cy="60" r="54" fill="none" stroke="rgba(0,255,255,0.25)" stroke-width="0.5" stroke-dasharray="2 4"/>

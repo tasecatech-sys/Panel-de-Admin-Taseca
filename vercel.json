@@ -2,5 +2,9 @@
   "rewrites": [
     { "source": "/", "destination": "/admin-taseca.html" },
     { "source": "/agendar", "destination": "/agendar-clase.html" }
+  ],
+  "redirects": [
+    { "source": "/mi-avance.html", "destination": "/agendar-clase.html#avance", "permanent": false },
+    { "source": "/mi-avance", "destination": "/agendar-clase.html#avance", "permanent": false }
   ]
 }
