@@ -673,7 +673,7 @@ const TABLE_MAPS = {
   clientes: { nombre:'nombre', sector:'sector', ciudad:'ciudad', producto:'producto', plan:'plan', email:'email', telefono:'telefono', estado:'estado', valorMensual:'valor_mensual', fechaRegistro:'fecha_registro', notas:'notas', documento:'documento' },
   clases_catalogo: { mes:'mes', plataforma:'plataforma', titulo:'titulo', contenido:'contenido' },
   progreso: { clienteId:'cliente_id', claseId:'clase_id', completed:'completed', completedBy:'completed_by', completedAt:'completed_at' },
-  horarios: { fecha:'fecha', hora:'hora', plataforma:'plataforma', profesor:'profesor', duracion:'duracion', modalidad:'modalidad', estado:'estado', clienteId:'cliente_id' },
+  horarios: { fecha:'fecha', hora:'hora', plataforma:'plataforma', profesor:'profesor', duracion:'duracion', modalidad:'modalidad', estado:'estado', clienteId:'cliente_id', completada:'completada' },
   ventas: { clienteId:'cliente_id', nombreLead:'nombre_lead', producto:'producto', plan:'plan', valor:'valor', etapa:'etapa', fecha:'fecha' },
   facturas: { clienteId:'cliente_id', producto:'producto', concepto:'concepto', monto:'monto', fechaEmision:'fecha_emision', fechaVenc:'fecha_venc', estado:'estado' },
   agenda: { clienteId:'cliente_id', tipo:'tipo', fecha:'fecha', hora:'hora', duracion:'duracion', modalidad:'modalidad', estado:'estado', notas:'notas' },
@@ -977,10 +977,13 @@ document.getElementById('overlay').addEventListener('click', (e)=>{
   if(e.target.id==='overlay') closeModal();
 });
 
-function confirmDialog(message, onConfirm){
+function confirmDialog(message, onConfirm, opts){
+  const label = (opts && opts.label) || 'Eliminar';
+  const icon = (opts && opts.icon) || ICONS.trash;
+  const btnClass = (opts && opts.btnClass) || 'btn-danger';
   openModal('Confirmar acción', `<div class="confirm-box">${message}</div>`,
     `<button class="btn btn-outline" id="cancelBtn">Cancelar</button>
-     <button class="btn btn-danger" id="okBtn">${ICONS.trash} Eliminar</button>`);
+     <button class="btn ${btnClass}" id="okBtn">${icon} ${label}</button>`);
   document.getElementById('cancelBtn').onclick = closeModal;
   document.getElementById('okBtn').onclick = ()=>{ onConfirm(); closeModal(); };
 }
@@ -2430,7 +2433,7 @@ function horariosCalCellsHtml(franjas){
     html += `<div class="cal-cell ${otherMonth?'cal-cell-muted':''} ${iso===todayIso?'cal-cell-today':''}" data-date="${iso}">
       <div class="cal-daynum">${cd}</div>
       <div class="cal-events">
-        ${dia.map(f=>`<div class="cal-event ${f.estado==='libre'?'badge-blue':'badge-red'}" title="${escapeHtml(f.hora+' · '+PLAT_LABEL_ESTUDIO[f.plataforma]+' · '+(f.estado==='libre'?'Libre':clienteNombre(f.clienteId)))}">${f.hora} ${PLAT_LABEL_ESTUDIO[f.plataforma]}</div>`).join('')}
+        ${dia.map(f=>`<div class="cal-event ${f.estado==='libre'?'badge-blue':'badge-red'}" title="${escapeHtml(f.hora+' · '+PLAT_LABEL_ESTUDIO[f.plataforma]+' · '+(f.estado==='libre'?'Libre':clienteNombre(f.clienteId))+(f.completada?' · Realizada':''))}">${f.completada?'✓ ':''}${f.hora} ${PLAT_LABEL_ESTUDIO[f.plataforma]}</div>`).join('')}
       </div>
     </div>`;
   }
@@ -2439,6 +2442,7 @@ function horariosCalCellsHtml(franjas){
 
 function openFranjaDayModal(iso){
   const dia = STATE.horarios.filter(f=>f.fecha===iso).sort((a,b)=>a.hora.localeCompare(b.hora));
+  const esPasada = daysBetween(iso) < 0;
   const d = new Date(iso+'T00:00:00');
   const label = d.toLocaleDateString('es-CO', {weekday:'long', day:'numeric', month:'long', year:'numeric'});
   openModal(label.charAt(0).toUpperCase()+label.slice(1), `
@@ -2446,12 +2450,19 @@ function openFranjaDayModal(iso){
       ${dia.length ? dia.map(f=>`
         <div class="day-event-row" style="cursor:default;">
           <div>
-            <div style="font-weight:700;font-size:13.5px;">${f.hora} · ${PLAT_LABEL_ESTUDIO[f.plataforma]}</div>
+            <div style="font-weight:700;font-size:13.5px;display:flex;align-items:center;gap:7px;">
+              ${f.hora} · ${PLAT_LABEL_ESTUDIO[f.plataforma]}
+              ${f.completada ? `<span class="badge badge-green" style="font-size:10px;">${ICONS.check} Realizada</span>` : ''}
+            </div>
             <div style="font-size:12px;color:var(--text-dim);margin-top:2px;">${f.modalidad} · ${f.duracion} min${f.profesor?' · '+escapeHtml(f.profesor):''}</div>
           </div>
-          ${f.estado==='libre'
-            ? `<div style="display:flex;align-items:center;gap:10px;"><span class="badge badge-blue"><span class="badge-dot"></span>Libre</span><button class="icon-btn danger" data-del-franja="${f.id}">${ICONS.trash}</button></div>`
-            : `<span class="badge badge-red"><span class="badge-dot"></span>${escapeHtml(clienteNombre(f.clienteId))}</span>`}
+          <div style="display:flex;align-items:center;gap:8px;">
+            ${f.estado==='libre'
+              ? `<span class="badge badge-blue"><span class="badge-dot"></span>Libre</span><button class="icon-btn danger" data-del-franja="${f.id}">${ICONS.trash}</button>`
+              : `<span class="badge badge-red"><span class="badge-dot"></span>${escapeHtml(clienteNombre(f.clienteId))}</span>
+                 ${esPasada ? `<button class="icon-btn ${f.completada?'':''}" title="${f.completada?'Marcar como no realizada':'Marcar clase como realizada'}" data-toggle-completada="${f.id}">${ICONS.check}</button>` : ''}
+                 <button class="btn btn-outline btn-sm" data-reagendar="${f.id}">Reagendar</button>`}
+          </div>
         </div>
       `).join('') : `<div class="empty-state">${ICONS.empty}<div>No hay horarios este día</div></div>`}
     </div>
@@ -2472,6 +2483,51 @@ function openFranjaDayModal(iso){
       STATE.horarios = STATE.horarios.filter(x=>x.id!==b.dataset.delFranja);
       closeModal(); renderPlanHorarios(); toast('Franja eliminada');
     });
+  }));
+  document.querySelectorAll('[data-toggle-completada]').forEach(b=>b.addEventListener('click', async ()=>{
+    const f = STATE.horarios.find(x=>x.id===b.dataset.toggleCompletada);
+    await dbUpdate('horarios', f.id, {completada: !f.completada});
+    f.completada = !f.completada;
+    openFranjaDayModal(iso);
+    toast(f.completada ? 'Clase marcada como realizada' : 'Clase marcada como no realizada');
+  }));
+  document.querySelectorAll('[data-reagendar]').forEach(b=>b.addEventListener('click', ()=>{
+    const f = STATE.horarios.find(x=>x.id===b.dataset.reagendar);
+    closeModal();
+    reagendarFranja(f);
+  }));
+}
+
+async function reagendarFranja(franja){
+  confirmDialog(`Esto libera el horario del ${formatDate(franja.fecha)} ${franja.hora} y te deja elegir uno nuevo para <b>${escapeHtml(clienteNombre(franja.clienteId))}</b>. ¿Continuar?`, async ()=>{
+    const clienteId = franja.clienteId;
+    await dbUpdate('horarios', franja.id, {estado:'libre', clienteId:null, completada:false});
+    franja.estado = 'libre'; franja.clienteId = null; franja.completada = false;
+    renderPlanHorarios();
+    openReagendarPicker(clienteId, franja.plataforma);
+  }, { label: 'Continuar', icon: ICONS.check, btnClass: 'btn-primary' });
+}
+
+function openReagendarPicker(clienteId, plataforma){
+  const libres = STATE.horarios
+    .filter(f=>f.estado==='libre' && f.plataforma===plataforma && daysBetween(f.fecha)>=0)
+    .sort((a,b)=>(a.fecha+a.hora).localeCompare(b.fecha+b.hora));
+  openModal(`Nuevo horario para ${escapeHtml(clienteNombre(clienteId))}`, `
+    <div style="display:flex;flex-direction:column;gap:8px;max-height:420px;overflow-y:auto;">
+      ${libres.length ? libres.map(f=>`
+        <button type="button" class="day-event-row" data-elegir-franja="${f.id}" style="width:100%;background:none;border:1px solid var(--border);cursor:pointer;font:inherit;text-align:left;">
+          <div style="font-weight:700;font-size:13.5px;">${formatDate(f.fecha)} · ${f.hora}</div>
+          <span class="badge badge-blue"><span class="badge-dot"></span>${PLAT_LABEL_ESTUDIO[f.plataforma]}</span>
+        </button>
+      `).join('') : `<div class="empty-state">${ICONS.empty}<div>No hay horarios libres de ${PLAT_LABEL_ESTUDIO[plataforma]} para reagendar. Genera uno nuevo primero.</div></div>`}
+    </div>
+  `, `<button class="btn btn-outline" id="cancelBtn">Cerrar</button>`);
+  document.getElementById('cancelBtn').onclick = closeModal;
+  document.querySelectorAll('[data-elegir-franja]').forEach(b=>b.addEventListener('click', async ()=>{
+    const f = STATE.horarios.find(x=>x.id===b.dataset.elegirFranja);
+    await dbUpdate('horarios', f.id, {estado:'reservada', clienteId});
+    f.estado = 'reservada'; f.clienteId = clienteId;
+    closeModal(); renderPlanHorarios(); toast('Clase reagendada');
   }));
 }
 
@@ -2927,6 +2983,14 @@ function RENDER_CONFIG(){
       <button class="btn btn-primary" id="saveConfig">${ICONS.check} Guardar cambios</button>
     </div>
     <div class="card" style="max-width:520px;margin-top:18px;">
+      <div class="card-title">Mi perfil</div>
+      <p style="font-size:12.5px;color:var(--text-dim);margin:0 0 14px;">Tu WhatsApp se usa para avisarte cuando un estudiante agenda una clase contigo.</p>
+      <div class="form-group"><label>Nombre</label><input id="mp_nombre" placeholder="Tu nombre"></div>
+      <div class="form-group"><label>WhatsApp</label><input id="mp_whatsapp" placeholder="573001234567"></div>
+      <button class="btn btn-primary" id="mp_guardar">${ICONS.check} Guardar mi perfil</button>
+      <p class="form-hint" id="mp_msg"></p>
+    </div>
+    <div class="card" style="max-width:520px;margin-top:18px;">
       <div class="card-title">Datos en la nube (Supabase)</div>
       <p style="font-size:12.5px;color:var(--text-dim);line-height:1.6;">
         Toda la información de este panel (clientes, ventas, facturas, agenda y cotizaciones) se guarda en tu
@@ -2968,6 +3032,7 @@ function RENDER_CONFIG(){
     </div>` : ''}
   `;
   if(CURRENT_USER_ROLE==='admin'){ renderStaffList(); wireStaffCreateForm(); }
+  loadMiPerfil();
   document.getElementById('saveConfig').onclick = async ()=>{
     const empresa = document.getElementById('f_empresa').value.trim() || 'Taseca Software';
     await updateConfigRow({ empresa });
@@ -2990,6 +3055,22 @@ function RENDER_CONFIG(){
       goTo('dashboard');
       toast('Datos restablecidos');
     });
+  };
+}
+
+async function loadMiPerfil(){
+  const email = CURRENT_USER_EMAIL.toLowerCase();
+  const { data } = await sb.from('staff_usuarios').select('*').eq('email', email).maybeSingle();
+  document.getElementById('mp_nombre').value = (data && data.nombre) || '';
+  document.getElementById('mp_whatsapp').value = (data && data.whatsapp) || '';
+  document.getElementById('mp_guardar').onclick = async ()=>{
+    const nombre = document.getElementById('mp_nombre').value.trim();
+    const whatsapp = document.getElementById('mp_whatsapp').value.trim();
+    const msg = document.getElementById('mp_msg');
+    const { error } = await sb.from('staff_usuarios').update({ nombre, whatsapp }).eq('email', email);
+    if(error){ msg.style.color = 'var(--danger)'; msg.textContent = 'No se pudo guardar: ' + error.message; return; }
+    msg.style.color = 'var(--ok)'; msg.textContent = 'Perfil guardado.';
+    toast('Perfil guardado');
   };
 }
 
