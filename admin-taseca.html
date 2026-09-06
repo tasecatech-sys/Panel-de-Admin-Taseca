@@ -904,8 +904,8 @@ const NAV = [
 
 const ROLE_NAV = {
   admin: ['dashboard','clientes','ventas','cotizaciones','productos','plan-estudio','facturas','agenda','reportes','config'],
-  profesor: ['dashboard','clientes','plan-estudio','agenda','productos'],
-  contador: ['dashboard','clientes','ventas','cotizaciones','facturas','reportes','productos'],
+  profesor: ['dashboard','clientes','plan-estudio','agenda','productos','config'],
+  contador: ['dashboard','clientes','ventas','cotizaciones','facturas','reportes','productos','config'],
 };
 function allowedViews(){
   return ROLE_NAV[CURRENT_USER_ROLE] || ROLE_NAV.admin;
@@ -2977,11 +2977,12 @@ function RENDER_REPORTES(){
 ========================================================= */
 function RENDER_CONFIG(){
   document.getElementById('view').innerHTML = `
+    ${CURRENT_USER_ROLE==='admin' ? `
     <div class="card" style="max-width:520px;">
       <div class="card-title">Datos de la empresa</div>
       <div class="form-group"><label>Nombre de la empresa</label><input id="f_empresa" value="${escapeHtml(STATE.config.empresa)}"></div>
       <button class="btn btn-primary" id="saveConfig">${ICONS.check} Guardar cambios</button>
-    </div>
+    </div>` : ''}
     <div class="card" style="max-width:520px;margin-top:18px;">
       <div class="card-title">Mi perfil</div>
       <p style="font-size:12.5px;color:var(--text-dim);margin:0 0 14px;">Tu WhatsApp se usa para avisarte cuando un estudiante agenda una clase contigo.</p>
@@ -2990,6 +2991,7 @@ function RENDER_CONFIG(){
       <button class="btn btn-primary" id="mp_guardar">${ICONS.check} Guardar mi perfil</button>
       <p class="form-hint" id="mp_msg"></p>
     </div>
+    ${CURRENT_USER_ROLE==='admin' ? `
     <div class="card" style="max-width:520px;margin-top:18px;">
       <div class="card-title">Datos en la nube (Supabase)</div>
       <p style="font-size:12.5px;color:var(--text-dim);line-height:1.6;">
@@ -3003,7 +3005,7 @@ function RENDER_CONFIG(){
       <p style="font-size:11px;color:var(--danger);margin-top:10px;">
         "Restablecer" sobrescribe los datos para <b>todo el equipo</b> (afecta la base de datos compartida), no solo tu navegador.
       </p>
-    </div>
+    </div>` : ''}
     ${CURRENT_USER_ROLE==='admin' ? `
     <div class="card" style="max-width:720px;margin-top:18px;">
       <div class="card-title">Gestión de usuarios</div>
@@ -3031,31 +3033,33 @@ function RENDER_CONFIG(){
       </p>
     </div>` : ''}
   `;
-  if(CURRENT_USER_ROLE==='admin'){ renderStaffList(); wireStaffCreateForm(); }
   loadMiPerfil();
-  document.getElementById('saveConfig').onclick = async ()=>{
-    const empresa = document.getElementById('f_empresa').value.trim() || 'Taseca Software';
-    await updateConfigRow({ empresa });
-    STATE.config.empresa = empresa;
-    document.getElementById('companyNameLabel').textContent = STATE.config.empresa;
-    toast('Configuración guardada');
-  };
-  document.getElementById('exportBtn').onclick = ()=>{
-    const blob = new Blob([JSON.stringify(STATE, null, 2)], {type:'application/json'});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url; a.download = 'taseca_admin_datos.json'; a.click();
-    URL.revokeObjectURL(url);
-  };
-  document.getElementById('resetBtn').onclick = ()=>{
-    confirmDialog('Esto reemplazará TODOS los datos actuales (de toda la empresa, no solo tu navegador) por los datos de ejemplo iniciales, incluyendo el progreso del Plan de Estudio de tus estudiantes actuales. ¿Continuar?', async ()=>{
-      await resetAllTables();
-      STATE = await loadState();
+  if(CURRENT_USER_ROLE==='admin'){
+    renderStaffList(); wireStaffCreateForm();
+    document.getElementById('saveConfig').onclick = async ()=>{
+      const empresa = document.getElementById('f_empresa').value.trim() || 'Taseca Software';
+      await updateConfigRow({ empresa });
+      STATE.config.empresa = empresa;
       document.getElementById('companyNameLabel').textContent = STATE.config.empresa;
-      goTo('dashboard');
-      toast('Datos restablecidos');
-    });
-  };
+      toast('Configuración guardada');
+    };
+    document.getElementById('exportBtn').onclick = ()=>{
+      const blob = new Blob([JSON.stringify(STATE, null, 2)], {type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = 'taseca_admin_datos.json'; a.click();
+      URL.revokeObjectURL(url);
+    };
+    document.getElementById('resetBtn').onclick = ()=>{
+      confirmDialog('Esto reemplazará TODOS los datos actuales (de toda la empresa, no solo tu navegador) por los datos de ejemplo iniciales, incluyendo el progreso del Plan de Estudio de tus estudiantes actuales. ¿Continuar?', async ()=>{
+        await resetAllTables();
+        STATE = await loadState();
+        document.getElementById('companyNameLabel').textContent = STATE.config.empresa;
+        goTo('dashboard');
+        toast('Datos restablecidos');
+      });
+    };
+  }
 }
 
 async function loadMiPerfil(){
