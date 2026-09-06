@@ -2377,7 +2377,7 @@ function renderPlanHorarios(){
         <div class="cal-grid">${horariosCalHtml}</div>
         <div style="display:flex;gap:14px;flex-wrap:wrap;margin-top:12px;font-size:11.5px;color:var(--text-dim);">
           <span style="display:flex;align-items:center;gap:5px;"><span style="width:9px;height:9px;border-radius:3px;background:#eaeaff;display:inline-block;"></span>Libre</span>
-          <span style="display:flex;align-items:center;gap:5px;"><span style="width:9px;height:9px;border-radius:3px;background:#e4f8ee;display:inline-block;"></span>Reservada</span>
+          <span style="display:flex;align-items:center;gap:5px;"><span style="width:9px;height:9px;border-radius:3px;background:#fdecee;display:inline-block;"></span>Reservada</span>
         </div>
       </div>
     </div>
@@ -2430,7 +2430,7 @@ function horariosCalCellsHtml(franjas){
     html += `<div class="cal-cell ${otherMonth?'cal-cell-muted':''} ${iso===todayIso?'cal-cell-today':''}" data-date="${iso}">
       <div class="cal-daynum">${cd}</div>
       <div class="cal-events">
-        ${dia.map(f=>`<div class="cal-event ${f.estado==='libre'?'badge-blue':'badge-green'}" title="${escapeHtml(f.hora+' · '+PLAT_LABEL_ESTUDIO[f.plataforma]+' · '+(f.estado==='libre'?'Libre':clienteNombre(f.clienteId)))}">${f.hora} ${PLAT_LABEL_ESTUDIO[f.plataforma]}</div>`).join('')}
+        ${dia.map(f=>`<div class="cal-event ${f.estado==='libre'?'badge-blue':'badge-red'}" title="${escapeHtml(f.hora+' · '+PLAT_LABEL_ESTUDIO[f.plataforma]+' · '+(f.estado==='libre'?'Libre':clienteNombre(f.clienteId)))}">${f.hora} ${PLAT_LABEL_ESTUDIO[f.plataforma]}</div>`).join('')}
       </div>
     </div>`;
   }
@@ -2451,7 +2451,7 @@ function openFranjaDayModal(iso){
           </div>
           ${f.estado==='libre'
             ? `<div style="display:flex;align-items:center;gap:10px;"><span class="badge badge-blue"><span class="badge-dot"></span>Libre</span><button class="icon-btn danger" data-del-franja="${f.id}">${ICONS.trash}</button></div>`
-            : `<span class="badge badge-green"><span class="badge-dot"></span>${escapeHtml(clienteNombre(f.clienteId))}</span>`}
+            : `<span class="badge badge-red"><span class="badge-dot"></span>${escapeHtml(clienteNombre(f.clienteId))}</span>`}
         </div>
       `).join('') : `<div class="empty-state">${ICONS.empty}<div>No hay horarios este día</div></div>`}
     </div>
@@ -2963,7 +2963,7 @@ function RENDER_CONFIG(){
       <button class="btn btn-primary" id="st_crear">Crear usuario</button>
       <p class="form-hint" id="st_msg"></p>
       <p style="font-size:11px;color:var(--text-dim);margin-top:10px;">
-        Requiere haber desplegado la función <code>create-staff-user</code> con la CLI de Supabase (<code>supabase functions deploy create-staff-user</code>).
+        Requiere haber desplegado la función <code>create-staff-user</code> (Supabase Dashboard &gt; Edge Functions, código en <code>supabase/functions/create-staff-user/index.ts</code>).
       </p>
     </div>` : ''}
   `;
