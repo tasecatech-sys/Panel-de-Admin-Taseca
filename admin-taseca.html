@@ -2328,8 +2328,21 @@ async function renderPlanHorarios(){
       <div class="card">
         <div class="qe-section-title"><span class="num">1</span>Habilitar horarios</div>
         <div class="form-row">
-          <div class="form-group"><label>Desde</label><input id="ho_desde" type="time" value="16:00"></div>
-          <div class="form-group"><label>Hasta</label><input id="ho_hasta" type="time" value="18:00"></div>
+          <div class="form-group"><label>Fecha desde</label><input id="ho_rango_desde" type="date"></div>
+          <div class="form-group"><label>Fecha hasta</label><input id="ho_rango_hasta" type="date"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>Hora desde</label><input id="ho_desde" type="time" value="16:00"></div>
+          <div class="form-group"><label>Hora hasta</label><input id="ho_hasta" type="time" value="18:00"></div>
+        </div>
+        <div class="form-group">
+          <label>Días de la semana que aplican</label>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;">
+            ${['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'].map((d,i)=>`
+              <label style="display:flex;align-items:center;gap:4px;font-size:12px;background:var(--panel-2);padding:4px 9px;border-radius:6px;cursor:pointer;border:1px solid var(--border);">
+                <input type="checkbox" class="ho_dia_check" value="${i}"> ${d}
+              </label>`).join('')}
+          </div>
         </div>
         <div class="form-row">
           <div class="form-group"><label>Duración (min)</label>
@@ -2352,34 +2365,26 @@ async function renderPlanHorarios(){
               <option value="Presencial">Presencial</option>
             </select>
           </div>
-          <div class="form-group"><label>Profesor (a nombre de quién)</label>
-            <input id="ho_profesor" value="${escapeHtml(CURRENT_USER_EMAIL)}" list="ho_profesor_list" placeholder="correo@taseca.tech">
-            <datalist id="ho_profesor_list">${profesores.map(p=>`<option value="${escapeHtml(p.email)}">${escapeHtml(p.nombre||p.email)}</option>`).join('')}</datalist>
-            <p class="form-hint">Escribe el correo de un profesor ya creado en Configuración → Gestión de usuarios (te lo sugiere abajo), o cualquier otro correo si aún no tiene cuenta en el panel.</p>
+          <div class="form-group"><label>Profesor</label>
+            ${profesores.length ? `
+            <select id="ho_profesor">
+              ${profesores.map(p=>`<option value="${escapeHtml(p.email)}" ${p.email===CURRENT_USER_EMAIL?'selected':''}>${escapeHtml(p.nombre||p.email)}</option>`).join('')}
+            </select>` : `
+            <input id="ho_profesor" value="${escapeHtml(CURRENT_USER_EMAIL)}" placeholder="correo@taseca.tech">
+            <p class="form-hint">Aún no hay profesores en Configuración → Gestión de usuarios. Escribe el correo a mano.</p>`}
           </div>
         </div>
-        <div class="form-group">
-          <label>Fechas (agrega una o varias)</label>
-          <div style="display:flex;gap:8px;">
+        <button class="btn btn-primary" id="ho_addRango" type="button">${ICONS.plus} Agregar estas fechas al plan</button>
+
+        <div class="form-group" style="margin-top:18px;">
+          <label>Fechas seleccionadas</label>
+          <div id="ho_fechasList" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;"></div>
+          <div style="display:flex;gap:8px;margin-top:10px;">
             <input id="ho_fecha" type="date" style="flex:1;">
-            <button class="btn btn-outline btn-sm" id="ho_addFecha" type="button">${ICONS.plus} Añadir</button>
+            <button class="btn btn-outline btn-sm" id="ho_addFecha" type="button">${ICONS.plus} Añadir fecha suelta</button>
           </div>
-          <div id="ho_fechasList" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;"></div>
-          <div style="border-top:1px solid var(--border);margin:14px 0 10px;"></div>
-          <label style="font-size:12px;color:var(--text-dim);">O agrega varias de un rango (ej: todos los lunes y miércoles del mes)</label>
-          <div style="display:flex;gap:8px;margin-top:6px;">
-            <input id="ho_rango_desde" type="date" style="flex:1;" placeholder="Desde">
-            <input id="ho_rango_hasta" type="date" style="flex:1;" placeholder="Hasta">
-          </div>
-          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
-            ${['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'].map((d,i)=>`
-              <label style="display:flex;align-items:center;gap:4px;font-size:12px;background:var(--panel-2);padding:4px 9px;border-radius:6px;cursor:pointer;border:1px solid var(--border);">
-                <input type="checkbox" class="ho_dia_check" value="${i}"> ${d}
-              </label>`).join('')}
-          </div>
-          <button class="btn btn-outline btn-sm" id="ho_addRango" type="button" style="margin-top:8px;">${ICONS.plus} Agregar fechas del rango</button>
         </div>
-        <button class="btn btn-primary" id="ho_generar">Generar franjas</button>
+        <button class="btn btn-primary" id="ho_generar" style="margin-top:14px;">Generar franjas</button>
         <p id="ho_msg" class="form-hint"></p>
       </div>
 
