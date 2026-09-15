@@ -2365,6 +2365,19 @@ async function renderPlanHorarios(){
             <button class="btn btn-outline btn-sm" id="ho_addFecha" type="button">${ICONS.plus} Añadir</button>
           </div>
           <div id="ho_fechasList" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;"></div>
+          <div style="border-top:1px solid var(--border);margin:14px 0 10px;"></div>
+          <label style="font-size:12px;color:var(--text-dim);">O agrega varias de un rango (ej: todos los lunes y miércoles del mes)</label>
+          <div style="display:flex;gap:8px;margin-top:6px;">
+            <input id="ho_rango_desde" type="date" style="flex:1;" placeholder="Desde">
+            <input id="ho_rango_hasta" type="date" style="flex:1;" placeholder="Hasta">
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;">
+            ${['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'].map((d,i)=>`
+              <label style="display:flex;align-items:center;gap:4px;font-size:12px;background:var(--panel-2);padding:4px 9px;border-radius:6px;cursor:pointer;border:1px solid var(--border);">
+                <input type="checkbox" class="ho_dia_check" value="${i}"> ${d}
+              </label>`).join('')}
+          </div>
+          <button class="btn btn-outline btn-sm" id="ho_addRango" type="button" style="margin-top:8px;">${ICONS.plus} Agregar fechas del rango</button>
         </div>
         <button class="btn btn-primary" id="ho_generar">Generar franjas</button>
         <p id="ho_msg" class="form-hint"></p>
@@ -2397,6 +2410,26 @@ async function renderPlanHorarios(){
   document.getElementById('ho_addFecha').onclick = ()=>{
     const v = document.getElementById('ho_fecha').value;
     if(v && !horariosFechasNuevas.includes(v)){ horariosFechasNuevas.push(v); renderFechasList(); }
+  };
+  document.getElementById('ho_addRango').onclick = ()=>{
+    const desde = document.getElementById('ho_rango_desde').value;
+    const hasta = document.getElementById('ho_rango_hasta').value;
+    const dias = [...document.querySelectorAll('.ho_dia_check:checked')].map(c=>Number(c.value));
+    if(!desde || !hasta){ toast('Elige la fecha inicial y final del rango'); return; }
+    if(!dias.length){ toast('Marca al menos un día de la semana'); return; }
+    const d = new Date(desde+'T00:00:00');
+    const end = new Date(hasta+'T00:00:00');
+    if(end < d){ toast('La fecha final debe ser posterior a la inicial'); return; }
+    let agregadas = 0;
+    while(d <= end){
+      if(dias.includes(d.getDay())){
+        const iso = isoFromParts(d.getFullYear(), d.getMonth(), d.getDate());
+        if(!horariosFechasNuevas.includes(iso)){ horariosFechasNuevas.push(iso); agregadas++; }
+      }
+      d.setDate(d.getDate()+1);
+    }
+    renderFechasList();
+    toast(agregadas ? agregadas+' fecha(s) agregadas' : 'Esas fechas ya estaban agregadas');
   };
   document.getElementById('ho_generar').onclick = generarFranjasUI;
 
