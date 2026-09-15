@@ -2294,7 +2294,7 @@ function openClaseModal(id){
 --------------------------------------------------------------- */
 let horariosFechasNuevas = [];
 
-function renderPlanHorarios(){
+async function renderPlanHorarios(){
   const horariosReady = Array.isArray(STATE.horarios);
   if(!horariosReady){
     document.getElementById('planEstudioBody').innerHTML = `
@@ -2303,6 +2303,8 @@ function renderPlanHorarios(){
       </div></div>`;
     return;
   }
+  const { data: profesoresData } = await sb.from('staff_usuarios').select('email, nombre').eq('activo', true).order('nombre');
+  const profesores = profesoresData || [];
 
   const franjas = [...STATE.horarios].sort((a,b)=> (a.fecha+a.hora).localeCompare(b.fecha+b.hora));
   const agendadas = STATE.horarios
@@ -2350,7 +2352,11 @@ function renderPlanHorarios(){
               <option value="Presencial">Presencial</option>
             </select>
           </div>
-          <div class="form-group"><label>Profesor (a nombre de quién)</label><input id="ho_profesor" value="${escapeHtml(CURRENT_USER_EMAIL)}"></div>
+          <div class="form-group"><label>Profesor (a nombre de quién)</label>
+            <input id="ho_profesor" value="${escapeHtml(CURRENT_USER_EMAIL)}" list="ho_profesor_list" placeholder="correo@taseca.tech">
+            <datalist id="ho_profesor_list">${profesores.map(p=>`<option value="${escapeHtml(p.email)}">${escapeHtml(p.nombre||p.email)}</option>`).join('')}</datalist>
+            <p class="form-hint">Escribe el correo de un profesor ya creado en Configuración → Gestión de usuarios (te lo sugiere abajo), o cualquier otro correo si aún no tiene cuenta en el panel.</p>
+          </div>
         </div>
         <div class="form-group">
           <label>Fechas (agrega una o varias)</label>
@@ -2739,7 +2745,7 @@ function RENDER_AGENDA(){
     cellsHtml += `<div class="cal-cell ${otherMonth?'cal-cell-muted':''} ${iso===todayIso?'cal-cell-today':''}" data-date="${iso}">
       <div class="cal-daynum">${cd}</div>
       <div class="cal-events">
-        ${events.map(ev=>`<div class="cal-event ${estadoBadge(ev.estado)}" data-agenda-id="${ev.id}" title="${escapeHtml(ev.hora+' · '+ev.tipo+' · '+clienteNombre(ev.clienteId))}"><span class="cal-event-time">${ev.hora}</span>${escapeHtml(ev.tipo)}</div>`).join('')}
+        ${events.map(ev=>`<div class="cal-event ${estadoBadge(ev.estado)}" data-agenda-id="${ev.id}" title="${escapeHtml(ev.hora+' · '+ev.tipo+' · '+clienteNombre(ev.clienteId)+(ev.profesor?' · '+ev.profesor:''))}"><span class="cal-event-time">${ev.hora}</span>${escapeHtml(ev.tipo)}</div>`).join('')}
       </div>
     </div>`;
   }
@@ -2788,7 +2794,7 @@ function openDayModal(iso){
         <div class="day-event-row" data-agenda-id="${a.id}">
           <div>
             <div style="font-weight:700;font-size:13.5px;">${a.hora} · ${escapeHtml(a.tipo)}</div>
-            <div style="font-size:12px;color:var(--text-dim);margin-top:2px;">${escapeHtml(clienteNombre(a.clienteId))} · ${escapeHtml(a.modalidad)}</div>
+            <div style="font-size:12px;color:var(--text-dim);margin-top:2px;">${escapeHtml(clienteNombre(a.clienteId))} · ${escapeHtml(a.modalidad)}${a.profesor?' · '+escapeHtml(a.profesor):''}</div>
           </div>
           <span class="badge ${estadoBadge(a.estado)}"><span class="badge-dot"></span>${a.estado}</span>
         </div>
@@ -2805,10 +2811,12 @@ function openDayModal(iso){
   });
 }
 
-function openAgendaModal(id, fechaDefault){
+async function openAgendaModal(id, fechaDefault){
   const editing = !!id;
-  const a = editing ? STATE.agenda.find(a=>a.id===id) : {clienteId:'', tipo:'Clase Excel', fecha:fechaDefault||todayISO(), hora:'10:00', duracion:'45 min', modalidad:'Virtual', estado:'Programada', notas:''};
+  const a = editing ? STATE.agenda.find(a=>a.id===id) : {clienteId:'', tipo:'Clase Excel', fecha:fechaDefault||todayISO(), hora:'10:00', duracion:'45 min', modalidad:'Virtual', estado:'Programada', notas:'', profesor:''};
   const clienteOptions = STATE.clientes.map(c=>`<option value="${c.id}" ${a.clienteId===c.id?'selected':''}>${escapeHtml(c.nombre)}</option>`).join('');
+  const { data: profesoresData } = await sb.from('staff_usuarios').select('email, nombre').eq('activo', true).order('nombre');
+  const profesores = profesoresData || [];
   openModal(editing?'Editar evento':'Nuevo evento de agenda', `
     <div class="form-group"><label>Cliente</label><select id="f_cliente"><option value="">Selecciona...</option>${clienteOptions}</select></div>
     <div class="form-row">
@@ -2837,6 +2845,10 @@ function openAgendaModal(id, fechaDefault){
           <option value="Cancelada" ${a.estado==='Cancelada'?'selected':''}>Cancelada</option>
         </select>
       </div>
+    </div>
+    <div class="form-group"><label>Profesor</label>
+      <input id="f_profesor" value="${escapeHtml(a.profesor||'')}" list="f_profesor_list" placeholder="correo@taseca.tech">
+      <datalist id="f_profesor_list">${profesores.map(p=>`<option value="${escapeHtml(p.email)}">${escapeHtml(p.nombre||p.email)}</option>`).join('')}</datalist>
     </div>
     <div class="form-group"><label>Notas</label><textarea id="f_notas">${escapeHtml(a.notas||'')}</textarea></div>
   `, `
@@ -2867,6 +2879,7 @@ function openAgendaModal(id, fechaDefault){
       duracion: document.getElementById('f_duracion').value.trim() || '45 min',
       estado: document.getElementById('f_estado').value,
       notas: document.getElementById('f_notas').value.trim(),
+      profesor: document.getElementById('f_profesor').value.trim(),
     };
     if(editing){ await dbUpdate('agenda', a.id, data); Object.assign(a, data); }
     else { const created = await dbInsert('agenda', {id:uid(), ...data}); STATE.agenda.push(created); }
