@@ -2531,25 +2531,10 @@ function openReagendarPicker(clienteId, plataforma){
   }));
 }
 
-// Distintas bases de datos de Taseca pueden tener guardada la
-// restricción "horarios_estado_check" con una palabra distinta para
-// "reservado" (reservada/reservado/ocupada/etc). En vez de asumir
-// una, se prueban en orden y se recuerda cuál acepta esta base de
-// datos, para no reintentar en cada llamada.
-const ESTADO_RESERVADO_CANDIDATOS = ['reservada','reservado','ocupada','ocupado','confirmada','confirmado','tomada','tomado','agendada','agendado','no_disponible','completa','completo'];
-let ESTADO_RESERVADO_CACHE = null;
-
 async function marcarFranjaReservada(franjaId, clienteId){
-  const intentos = ESTADO_RESERVADO_CACHE
-    ? [ESTADO_RESERVADO_CACHE, ...ESTADO_RESERVADO_CANDIDATOS.filter(v=>v!==ESTADO_RESERVADO_CACHE)]
-    : ESTADO_RESERVADO_CANDIDATOS;
-  for(const valor of intentos){
-    const { error } = await sb.from('horarios').update({ estado: valor, cliente_id: clienteId }).eq('id', franjaId);
-    if(!error){ ESTADO_RESERVADO_CACHE = valor; return valor; }
-    if(error.code !== '23514'){ console.error(error); toast('Error actualizando horarios'); throw error; }
-  }
-  toast('No se pudo reagendar: ningún valor de "reservado" fue aceptado por la base de datos.');
-  throw new Error('estado "reservado" no encontrado');
+  const { error } = await sb.from('horarios').update({ estado: 'reservado', cliente_id: clienteId }).eq('id', franjaId);
+  if(error){ console.error(error); toast('Error actualizando horarios'); throw error; }
+  return 'reservado';
 }
 
 function renderFechasList(){
