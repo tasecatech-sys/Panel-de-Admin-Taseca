@@ -681,7 +681,7 @@ const TABLE_MAPS = {
   facturas: { clienteId:'cliente_id', producto:'producto', concepto:'concepto', monto:'monto', fechaEmision:'fecha_emision', fechaVenc:'fecha_venc', estado:'estado' },
   agenda: { clienteId:'cliente_id', tipo:'tipo', fecha:'fecha', hora:'hora', duracion:'duracion', modalidad:'modalidad', estado:'estado', notas:'notas', profesor:'profesor' },
   cotizaciones: { numero:'numero', fecha:'fecha', validezDias:'validez_dias', estado:'estado', clienteId:'cliente_id', clienteNombre:'cliente_nombre', clienteContacto:'cliente_contacto', clienteEmail:'cliente_email', consultorNombre:'consultor_nombre', consultorCargo:'consultor_cargo', consultorContacto:'consultor_contacto', tipoServicio:'tipo_servicio', titulo:'titulo', resumen:'resumen', fases:'fases', items:'items', ivaPct:'iva_pct', formaPago:'forma_pago', tiempoEjecucion:'tiempo_ejecucion', notasAdicionales:'notas_adicionales' },
-  fin_movimientos: { tipo:'tipo', fecha:'fecha', categoria:'categoria', concepto:'concepto', monto:'monto', metodoPago:'metodo_pago', notas:'notas', createdBy:'created_by' },
+  fin_movimientos: { tipo:'tipo', fecha:'fecha', categoria:'categoria', concepto:'concepto', monto:'monto', metodoPago:'metodo_pago', notas:'notas', socio:'socio', createdBy:'created_by', createdAt:'created_at' },
   fin_prestamos: { deudor:'deudor', documento:'documento', telefono:'telefono', capital:'capital', tasaMensual:'tasa_mensual', fechaDesembolso:'fecha_desembolso', estado:'estado', fechaCierre:'fecha_cierre', notas:'notas' },
   fin_prestamo_pagos: { prestamoId:'prestamo_id', tipo:'tipo', fecha:'fecha', monto:'monto', periodo:'periodo', notas:'notas' },
   productos: { slug:'slug', tipo:'tipo', nombre:'nombre', etiqueta:'etiqueta', descripcion:'descripcion', segmentos:'segmentos', planes:'planes', incluye:'incluye', color:'color', orden:'orden', activo:'activo' },
@@ -3266,6 +3266,7 @@ document.getElementById('globalSearch').addEventListener('input', (e)=>{
 let finTab = 'resumen'; // 'resumen' | 'movimientos' | 'prestamos'
 let finMes = todayISO().slice(0,7); // YYYY-MM
 let finTipoFiltro = '';
+let finMovMes = ''; // '' = todos los meses
 let finPrestamoFiltro = 'Activo';
 
 const FIN_CATEGORIAS = {
@@ -3366,12 +3367,39 @@ function prestamoEstadoBadge(p, info){
   return '<span class="badge badge-green"><span class="badge-dot"></span>Al día</span>';
 }
 
+const sumMonto = arr => arr.reduce((s,x)=>s+Number(x.monto||0),0);
+
 function finTotalesMes(ym){
-  const movs = STATE.fin.movimientos.filter(m=>(m.fecha||'').slice(0,7)===ym);
-  const ingresos = movs.filter(m=>m.tipo==='ingreso').reduce((s,m)=>s+Number(m.monto||0),0);
-  const gastos = movs.filter(m=>m.tipo==='gasto').reduce((s,m)=>s+Number(m.monto||0),0);
-  const intereses = STATE.fin.pagos.filter(x=>x.tipo==='interes' && (x.fecha||'').slice(0,7)===ym).reduce((s,x)=>s+Number(x.monto||0),0);
-  return { ingresos, gastos, intereses, balance: ingresos + intereses - gastos };
+  const enMes = x => !ym || (x.fecha||'').slice(0,7)===ym;
+  const movs = STATE.fin.movimientos.filter(enMes);
+  const ingresos = sumMonto(movs.filter(m=>m.tipo==='ingreso'));
+  const gastos = sumMonto(movs.filter(m=>m.tipo==='gasto'));
+  const socios = sumMonto(movs.filter(m=>m.tipo==='socio'));
+  const intereses = sumMonto(STATE.fin.pagos.filter(x=>x.tipo==='interes' && enMes(x)));
+  return { ingresos, gastos, socios, intereses, utilidad: ingresos + intereses - gastos };
+}
+
+// Dinero disponible (caja) acumulado a hoy:
+// ingresos + intereses cobrados + capital devuelto − gastos − capital prestado − pagos a socios
+function finCaja(){
+  const t = finTotalesMes(null);
+  const capitalPrestado = sumMonto(STATE.fin.prestamos.map(p=>({monto:p.capital})));
+  const capitalDevuelto = sumMonto(STATE.fin.pagos.filter(x=>x.tipo==='capital'));
+  return { ...t, capitalPrestado, capitalDevuelto,
+    disponible: t.ingresos + t.intereses + capitalDevuelto - t.gastos - capitalPrestado - t.socios };
+}
+function finSociosResumen(){
+  const map = {};
+  STATE.fin.movimientos.filter(m=>m.tipo==='socio').forEach(m=>{
+    const k = (m.socio||'Sin nombre').trim();
+    map[k] = map[k] || { socio:k, total:0, ultimo:null, n:0 };
+    map[k].total += Number(m.monto||0); map[k].n++;
+    if(!map[k].ultimo || m.fecha > map[k].ultimo) map[k].ultimo = m.fecha;
+  });
+  return Object.values(map).sort((a,b)=>b.total-a.total);
+}
+function finSociosNombres(){
+  return [...new Set(STATE.fin.movimientos.filter(m=>m.tipo==='socio' && m.socio).map(m=>m.socio.trim()))];
 }
 
 function RENDER_FINANZAS(){
@@ -3385,7 +3413,7 @@ function RENDER_FINANZAS(){
   document.getElementById('view').innerHTML = `
     <div class="pill-tabs" style="margin-bottom:18px;">
       <button class="pill-tab ${finTab==='resumen'?'active':''}" data-fintab="resumen">Resumen</button>
-      <button class="pill-tab ${finTab==='movimientos'?'active':''}" data-fintab="movimientos">Ingresos y gastos</button>
+      <button class="pill-tab ${finTab==='movimientos'?'active':''}" data-fintab="movimientos">Movimientos</button>
       <button class="pill-tab ${finTab==='prestamos'?'active':''}" data-fintab="prestamos">Préstamos</button>
     </div>
     <div id="finBody"></div>
@@ -3398,21 +3426,37 @@ function RENDER_FINANZAS(){
 
 /* ---------- Resumen ---------- */
 function renderFinResumen(){
+  const caja = finCaja();
   const t = finTotalesMes(finMes);
   const activos = STATE.fin.prestamos.filter(p=>p.estado!=='Pagado');
   const infos = activos.map(p=>({p, info:prestamoInfo(p)}));
   const capitalActivo = activos.reduce((s,p)=>s+Number(p.capital||0),0);
   const interesVencido = infos.reduce((s,x)=>s+x.info.interesVencido,0);
-  const interesMensualEsperado = infos.reduce((s,x)=>s+x.info.cuota,0);
+  const socios = finSociosResumen();
 
   const meses = [];
   for(let i=5; i>=0; i--) meses.push(addMonthsISO(finMes+'-01', -i).slice(0,7));
   const filasMeses = meses.map(ym=>({ym, ...finTotalesMes(ym)}));
-
-  const proximos = infos.filter(x=>x.info.proxima)
-    .sort((a,b)=>a.info.proxima.fecha.localeCompare(b.info.proxima.fecha));
+  const proximos = infos.filter(x=>x.info.proxima).sort((a,b)=>a.info.proxima.fecha.localeCompare(b.info.proxima.fecha));
+  const fila = (label, valor, signo, color) => `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--border);font-size:13px;"><span class="cell-dim" style="font-size:13px;">${label}</span><b style="color:${color||'var(--text)'}">${signo} ${formatCOP(valor)}</b></div>`;
 
   document.getElementById('finBody').innerHTML = `
+    <div class="grid grid-2" style="margin-bottom:18px;">
+      <div class="card kpi">
+        <div class="label">Dinero disponible (caja)</div>
+        <div class="value" style="font-size:32px;color:${caja.disponible>=0?'var(--ok)':'var(--danger)'}">${formatCOP(caja.disponible)}</div>
+        <div class="delta">Acumulado de todos los movimientos registrados</div>
+      </div>
+      <div class="card">
+        <h3 style="margin:0 0 8px;font-size:14px;">¿Cómo se calcula?</h3>
+        ${fila('Ingresos', caja.ingresos, '+', 'var(--ok)')}
+        ${fila('Intereses cobrados', caja.intereses, '+', 'var(--ok)')}
+        ${fila('Capital devuelto de préstamos', caja.capitalDevuelto, '+', 'var(--ok)')}
+        ${fila('Gastos', caja.gastos, '−', 'var(--danger)')}
+        ${fila('Capital prestado', caja.capitalPrestado, '−', 'var(--danger)')}
+        ${fila('Pagos a socios', caja.socios, '−', 'var(--danger)')}
+      </div>
+    </div>
     <div class="toolbar">
       <div class="toolbar-left">
         <label class="cell-dim" for="finMesResumen">Mes</label>
@@ -3420,102 +3464,126 @@ function renderFinResumen(){
       </div>
     </div>
     <div class="grid grid-4" style="margin-bottom:18px;">
-      <div class="card kpi"><div class="label">Ingresos del mes</div><div class="value" style="color:var(--ok)">${formatCOP(t.ingresos)}</div><div class="delta">Sin contar intereses</div></div>
-      <div class="card kpi"><div class="label">Intereses cobrados</div><div class="value" style="color:var(--accent)">${formatCOP(t.intereses)}</div><div class="delta">Pagos de préstamos en el mes</div></div>
-      <div class="card kpi"><div class="label">Gastos del mes</div><div class="value" style="color:var(--danger)">${formatCOP(t.gastos)}</div></div>
-      <div class="card kpi"><div class="label">Balance del mes</div><div class="value" style="color:${t.balance>=0?'var(--ok)':'var(--danger)'}">${formatCOP(t.balance)}</div><div class="delta">Ingresos + intereses − gastos</div></div>
+      <div class="card kpi"><div class="label">Ingresos + intereses</div><div class="value" style="color:var(--ok)">${formatCOP(t.ingresos + t.intereses)}</div><div class="delta">${mesLabel(finMes)}</div></div>
+      <div class="card kpi"><div class="label">Gastos</div><div class="value" style="color:var(--danger)">${formatCOP(t.gastos)}</div><div class="delta">${mesLabel(finMes)}</div></div>
+      <div class="card kpi"><div class="label">Utilidad del mes</div><div class="value" style="color:${t.utilidad>=0?'var(--ok)':'var(--danger)'}">${formatCOP(t.utilidad)}</div><div class="delta">Ingresos + intereses − gastos</div></div>
+      <div class="card kpi"><div class="label">Pagado a socios</div><div class="value" style="color:var(--accent)">${formatCOP(t.socios)}</div><div class="delta">${mesLabel(finMes)}</div></div>
     </div>
-    <div class="grid grid-3" style="margin-bottom:18px;">
-      <div class="card kpi"><div class="label">Capital prestado vigente</div><div class="value">${formatCOP(capitalActivo)}</div><div class="delta">${activos.length} préstamo(s) activo(s)</div></div>
-      <div class="card kpi"><div class="label">Interés mensual esperado</div><div class="value">${formatCOP(interesMensualEsperado)}</div></div>
-      <div class="card kpi"><div class="label">Intereses vencidos por cobrar</div><div class="value" style="color:${interesVencido?'var(--danger)':'var(--text)'}">${formatCOP(interesVencido)}</div></div>
-    </div>
-    <div class="grid grid-2">
+    <div class="grid grid-2" style="margin-bottom:18px;">
       <div class="card">
         <h3 style="margin:0 0 12px;font-size:14px;">Últimos 6 meses</h3>
         <div class="table-wrap"><table>
-          <thead><tr><th>Mes</th><th>Ingresos</th><th>Intereses</th><th>Gastos</th><th>Balance</th></tr></thead>
+          <thead><tr><th>Mes</th><th>Ingresos</th><th>Intereses</th><th>Gastos</th><th>Utilidad</th><th>Socios</th></tr></thead>
           <tbody>${filasMeses.map(r=>`
             <tr>
               <td class="cell-strong">${mesLabel(r.ym)}</td>
               <td>${formatCOP(r.ingresos)}</td>
               <td>${formatCOP(r.intereses)}</td>
               <td>${formatCOP(r.gastos)}</td>
-              <td class="cell-strong" style="color:${r.balance>=0?'var(--ok)':'var(--danger)'}">${formatCOP(r.balance)}</td>
+              <td class="cell-strong" style="color:${r.utilidad>=0?'var(--ok)':'var(--danger)'}">${formatCOP(r.utilidad)}</td>
+              <td>${formatCOP(r.socios)}</td>
             </tr>`).join('')}
           </tbody>
         </table></div>
       </div>
       <div class="card">
-        <h3 style="margin:0 0 12px;font-size:14px;">Próximos cobros de interés</h3>
-        ${proximos.length ? proximos.map(({p, info})=>{
-          const dias = daysBetween(info.proxima.fecha);
-          const cuando = dias<0 ? `<span style="color:var(--danger);font-weight:700;">Vencida hace ${-dias} día(s)</span>` : dias===0 ? '<span style="color:var(--warn);font-weight:700;">Hoy</span>' : `En ${dias} día(s)`;
-          return `<div style="display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
-            <div><div class="cell-strong">${escapeHtml(p.deudor)}</div><div class="cell-dim">Cuota ${info.proxima.periodo} · ${formatDate(info.proxima.fecha)} · ${cuando}</div></div>
-            <div class="cell-strong">${formatCOP(info.cuota)}</div>
-          </div>`;
-        }).join('') : `<div class="empty-state">${ICONS.empty}<div>No hay préstamos activos</div></div>`}
+        <h3 style="margin:0 0 12px;font-size:14px;">Pagos a socios (histórico)</h3>
+        ${socios.length ? socios.map(s=>`
+          <div style="display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
+            <div><div class="cell-strong">${escapeHtml(s.socio)}</div><div class="cell-dim">${s.n} pago(s) · último ${formatDate(s.ultimo)}</div></div>
+            <div class="cell-strong">${formatCOP(s.total)}</div>
+          </div>`).join('') : `<div class="empty-state">${ICONS.empty}<div>Aún no hay pagos a socios</div></div>`}
+        <button class="btn btn-outline btn-sm" id="finPagoSocioResumen" style="margin-top:12px;">${ICONS.plus} Registrar pago a socio</button>
       </div>
+    </div>
+    <div class="grid grid-3" style="margin-bottom:18px;">
+      <div class="card kpi"><div class="label">Capital prestado vigente</div><div class="value">${formatCOP(capitalActivo)}</div><div class="delta">${activos.length} préstamo(s) activo(s)</div></div>
+      <div class="card kpi"><div class="label">Interés mensual esperado</div><div class="value">${formatCOP(infos.reduce((s,x)=>s+x.info.cuota,0))}</div></div>
+      <div class="card kpi"><div class="label">Intereses vencidos por cobrar</div><div class="value" style="color:${interesVencido?'var(--danger)':'var(--text)'}">${formatCOP(interesVencido)}</div></div>
+    </div>
+    <div class="card">
+      <h3 style="margin:0 0 12px;font-size:14px;">Próximos cobros de interés</h3>
+      ${proximos.length ? proximos.map(({p, info})=>{
+        const dias = daysBetween(info.proxima.fecha);
+        const cuando = dias<0 ? `<span style="color:var(--danger);font-weight:700;">Vencida hace ${-dias} día(s)</span>` : dias===0 ? '<span style="color:var(--warn);font-weight:700;">Hoy</span>' : `En ${dias} día(s)`;
+        return `<div style="display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
+          <div><div class="cell-strong">${escapeHtml(p.deudor)}</div><div class="cell-dim">Cuota ${info.proxima.periodo} · ${formatDate(info.proxima.fecha)} · ${cuando}</div></div>
+          <div class="cell-strong">${formatCOP(info.cuota)}</div>
+        </div>`;
+      }).join('') : `<div class="empty-state">${ICONS.empty}<div>No hay préstamos activos</div></div>`}
     </div>
   `;
   document.getElementById('finMesResumen').addEventListener('change', e=>{ if(e.target.value){ finMes = e.target.value; renderFinResumen(); } });
+  document.getElementById('finPagoSocioResumen').onclick = ()=>openMovimientoModal(null, 'socio');
 }
 
-/* ---------- Ingresos y gastos ---------- */
+/* ---------- Movimientos (ingresos, gastos y pagos a socios) ---------- */
+const FIN_TIPO_LABEL = { ingreso:'Ingreso', gasto:'Gasto', socio:'Pago a socio' };
+const FIN_TIPO_BADGE = { ingreso:'badge-green', gasto:'badge-red', socio:'badge-purple' };
+
 function renderFinMovimientos(){
+  const mesesDisponibles = [...new Set(STATE.fin.movimientos.map(m=>(m.fecha||'').slice(0,7)).filter(Boolean))].sort().reverse();
+  if(finMovMes && !mesesDisponibles.includes(finMovMes)) mesesDisponibles.unshift(finMovMes);
   const rows = STATE.fin.movimientos
-    .filter(m=>(m.fecha||'').slice(0,7)===finMes && (!finTipoFiltro || m.tipo===finTipoFiltro))
-    .sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
-  const t = finTotalesMes(finMes);
+    .filter(m=>(!finMovMes || (m.fecha||'').slice(0,7)===finMovMes) && (!finTipoFiltro || m.tipo===finTipoFiltro))
+    .sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'') || (b.createdAt||'').localeCompare(a.createdAt||''));
+  const t = finTotalesMes(finMovMes || null);
+  const periodo = finMovMes ? mesLabel(finMovMes) : 'todos los meses';
+  const neto = t.ingresos - t.gastos - t.socios;
 
   document.getElementById('finBody').innerHTML = `
-    <div class="grid grid-3" style="margin-bottom:18px;">
-      <div class="card kpi"><div class="label">Ingresos (${mesLabel(finMes)})</div><div class="value" style="color:var(--ok)">${formatCOP(t.ingresos)}</div></div>
-      <div class="card kpi"><div class="label">Gastos (${mesLabel(finMes)})</div><div class="value" style="color:var(--danger)">${formatCOP(t.gastos)}</div></div>
-      <div class="card kpi"><div class="label">Diferencia</div><div class="value" style="color:${t.ingresos-t.gastos>=0?'var(--ok)':'var(--danger)'}">${formatCOP(t.ingresos-t.gastos)}</div><div class="delta">No incluye intereses de préstamos</div></div>
+    <div class="grid grid-4" style="margin-bottom:18px;">
+      <div class="card kpi"><div class="label">Ingresos</div><div class="value" style="color:var(--ok)">${formatCOP(t.ingresos)}</div><div class="delta">${periodo}</div></div>
+      <div class="card kpi"><div class="label">Gastos</div><div class="value" style="color:var(--danger)">${formatCOP(t.gastos)}</div><div class="delta">${periodo}</div></div>
+      <div class="card kpi"><div class="label">Pagos a socios</div><div class="value" style="color:var(--accent)">${formatCOP(t.socios)}</div><div class="delta">${periodo}</div></div>
+      <div class="card kpi"><div class="label">Ingresos − gastos − socios</div><div class="value" style="color:${neto>=0?'var(--ok)':'var(--danger)'}">${formatCOP(neto)}</div><div class="delta">Sin préstamos (ver Resumen → caja)</div></div>
     </div>
     <div class="card">
       <div class="toolbar">
         <div class="toolbar-left">
-          <input type="month" class="filter" id="finMesMov" value="${finMes}">
+          <select class="filter" id="finMesMov">
+            <option value="">Todos los meses</option>
+            ${mesesDisponibles.map(ym=>`<option value="${ym}" ${finMovMes===ym?'selected':''}>${mesLabel(ym)}</option>`).join('')}
+          </select>
           <select class="filter" id="finTipoMov">
-            <option value="">Ingresos y gastos</option>
+            <option value="">Todos los tipos</option>
             <option value="ingreso" ${finTipoFiltro==='ingreso'?'selected':''}>Solo ingresos</option>
             <option value="gasto" ${finTipoFiltro==='gasto'?'selected':''}>Solo gastos</option>
+            <option value="socio" ${finTipoFiltro==='socio'?'selected':''}>Solo pagos a socios</option>
           </select>
         </div>
         <div class="toolbar-left">
-          <button class="btn btn-outline btn-sm" id="finNuevoIngreso">${ICONS.plus} Ingreso</button>
-          <button class="btn btn-outline btn-sm" id="finNuevoGasto">${ICONS.plus} Gasto</button>
+          <button class="btn btn-outline btn-sm" data-finnuevo="ingreso">${ICONS.plus} Ingreso</button>
+          <button class="btn btn-outline btn-sm" data-finnuevo="gasto">${ICONS.plus} Gasto</button>
+          <button class="btn btn-outline btn-sm" data-finnuevo="socio">${ICONS.plus} Pago a socio</button>
         </div>
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Fecha</th><th>Tipo</th><th>Categoría</th><th>Concepto</th><th>Método</th><th style="text-align:right;">Monto</th><th></th></tr></thead>
+          <thead><tr><th>Fecha</th><th>Tipo</th><th>Categoría / Socio</th><th>Concepto</th><th>Método</th><th style="text-align:right;">Monto</th><th></th></tr></thead>
           <tbody>
             ${rows.length ? rows.map(m=>`
               <tr>
                 <td class="cell-dim">${formatDate(m.fecha)}</td>
-                <td>${m.tipo==='ingreso' ? '<span class="badge badge-green"><span class="badge-dot"></span>Ingreso</span>' : '<span class="badge badge-red"><span class="badge-dot"></span>Gasto</span>'}</td>
-                <td>${escapeHtml(m.categoria||'—')}</td>
+                <td><span class="badge ${FIN_TIPO_BADGE[m.tipo]||'badge-gray'}"><span class="badge-dot"></span>${FIN_TIPO_LABEL[m.tipo]||m.tipo}</span></td>
+                <td>${escapeHtml((m.tipo==='socio' ? m.socio : m.categoria) || '—')}</td>
                 <td class="cell-dim">${escapeHtml(m.concepto||'')}</td>
                 <td class="cell-dim">${escapeHtml(m.metodoPago||'—')}</td>
-                <td class="cell-strong" style="text-align:right;color:${m.tipo==='ingreso'?'var(--ok)':'var(--danger)'}">${m.tipo==='ingreso'?'+':'−'} ${formatCOP(m.monto)}</td>
+                <td class="cell-strong" style="text-align:right;color:${m.tipo==='ingreso'?'var(--ok)':m.tipo==='socio'?'var(--accent)':'var(--danger)'}">${m.tipo==='ingreso'?'+':'−'} ${formatCOP(m.monto)}</td>
                 <td><div class="row-actions">
                   <button class="icon-btn" data-finmov-edit="${m.id}">${ICONS.edit}</button>
                   <button class="icon-btn danger" data-finmov-del="${m.id}">${ICONS.trash}</button>
                 </div></td>
-              </tr>`).join('') : `<tr><td colspan="7"><div class="empty-state">${ICONS.empty}<div>No hay movimientos en ${mesLabel(finMes)}</div></div></td></tr>`}
+              </tr>`).join('') : `<tr><td colspan="7"><div class="empty-state">${ICONS.empty}<div>No hay movimientos con estos filtros</div></div></td></tr>`}
           </tbody>
         </table>
       </div>
+      <div style="font-size:12.5px;color:var(--text-dim);margin-top:10px;">${rows.length} movimiento(s) · ${periodo}</div>
     </div>
   `;
-  document.getElementById('finMesMov').addEventListener('change', e=>{ if(e.target.value){ finMes = e.target.value; renderFinMovimientos(); } });
+  document.getElementById('finMesMov').addEventListener('change', e=>{ finMovMes = e.target.value; renderFinMovimientos(); });
   document.getElementById('finTipoMov').addEventListener('change', e=>{ finTipoFiltro = e.target.value; renderFinMovimientos(); });
-  document.getElementById('finNuevoIngreso').onclick = ()=>openMovimientoModal(null, 'ingreso');
-  document.getElementById('finNuevoGasto').onclick = ()=>openMovimientoModal(null, 'gasto');
+  document.querySelectorAll('[data-finnuevo]').forEach(b=>b.onclick = ()=>openMovimientoModal(null, b.dataset.finnuevo));
   document.querySelectorAll('[data-finmov-edit]').forEach(b=>b.addEventListener('click', ()=>openMovimientoModal(b.dataset.finmovEdit)));
   document.querySelectorAll('[data-finmov-del]').forEach(b=>b.addEventListener('click', ()=>{
     confirmDialog('¿Eliminar este movimiento?', async ()=>{
@@ -3529,20 +3597,23 @@ function renderFinMovimientos(){
 function openMovimientoModal(id, tipoDefault){
   const editing = !!id;
   const m = editing ? STATE.fin.movimientos.find(x=>x.id===id)
-    : { tipo: tipoDefault||'ingreso', fecha: todayISO(), categoria:'', concepto:'', monto:0, metodoPago:'Transferencia', notas:'' };
-  const catOptions = tipo => FIN_CATEGORIAS[tipo].map(c=>`<option value="${escapeHtml(c)}">`).join('');
-  openModal(editing ? 'Editar movimiento' : (m.tipo==='gasto' ? 'Nuevo gasto' : 'Nuevo ingreso'), `
+    : { tipo: tipoDefault||'ingreso', fecha: todayISO(), categoria:'', socio:'', concepto:'', monto:0, metodoPago:'Transferencia', notas:'' };
+  const catOptions = tipo => (FIN_CATEGORIAS[tipo]||[]).map(c=>`<option value="${escapeHtml(c)}">`).join('');
+  const titulo = editing ? 'Editar movimiento' : (m.tipo==='gasto' ? 'Nuevo gasto' : m.tipo==='socio' ? 'Nuevo pago a socio' : 'Nuevo ingreso');
+  openModal(titulo, `
     <div class="form-row">
       <div class="form-group"><label>Tipo</label>
         <select id="fm_tipo">
           <option value="ingreso" ${m.tipo==='ingreso'?'selected':''}>Ingreso</option>
           <option value="gasto" ${m.tipo==='gasto'?'selected':''}>Gasto</option>
+          <option value="socio" ${m.tipo==='socio'?'selected':''}>Pago a socio</option>
         </select>
       </div>
       <div class="form-group"><label>Fecha</label><input id="fm_fecha" type="date" value="${m.fecha||todayISO()}"></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>Categoría</label><input id="fm_categoria" list="fm_cat_list" value="${escapeHtml(m.categoria||'')}" placeholder="Escribe o elige"><datalist id="fm_cat_list">${catOptions(m.tipo)}</datalist></div>
+      <div class="form-group" id="fm_cat_group"><label>Categoría</label><input id="fm_categoria" list="fm_cat_list" value="${escapeHtml(m.categoria||'')}" placeholder="Escribe o elige"><datalist id="fm_cat_list">${catOptions(m.tipo)}</datalist></div>
+      <div class="form-group" id="fm_socio_group"><label>Socio</label><input id="fm_socio" list="fm_socio_list" value="${escapeHtml(m.socio||'')}" placeholder="Nombre del socio"><datalist id="fm_socio_list">${finSociosNombres().map(n=>`<option value="${escapeHtml(n)}">`).join('')}</datalist></div>
       <div class="form-group"><label>Monto (COP)</label>${moneyInputHtml('fm_monto', m.monto)}</div>
     </div>
     <div class="form-group"><label>Concepto</label><input id="fm_concepto" value="${escapeHtml(m.concepto||'')}" placeholder="Ej: Mentoría Power BI - mes 2"></div>
@@ -3555,17 +3626,26 @@ function openMovimientoModal(id, tipoDefault){
     <button class="btn btn-primary" id="saveBtn">${ICONS.check} Guardar</button>
   `);
   attachMoneyInputs();
-  document.getElementById('fm_tipo').addEventListener('change', e=>{
-    document.getElementById('fm_cat_list').innerHTML = catOptions(e.target.value);
-  });
+  const ajustarTipo = ()=>{
+    const tipo = document.getElementById('fm_tipo').value;
+    document.getElementById('fm_cat_group').style.display = tipo==='socio' ? 'none' : '';
+    document.getElementById('fm_socio_group').style.display = tipo==='socio' ? '' : 'none';
+    document.getElementById('fm_cat_list').innerHTML = catOptions(tipo);
+  };
+  document.getElementById('fm_tipo').addEventListener('change', ajustarTipo);
+  ajustarTipo();
   document.getElementById('cancelBtn').onclick = closeModal;
   document.getElementById('saveBtn').onclick = async ()=>{
+    const tipo = document.getElementById('fm_tipo').value;
     const monto = parseMoney(document.getElementById('fm_monto').value);
     if(monto<=0){ toast('Ingresa un monto mayor a 0'); return; }
+    const socio = document.getElementById('fm_socio').value.trim();
+    if(tipo==='socio' && !socio){ toast('Escribe el nombre del socio'); return; }
     const data = {
-      tipo: document.getElementById('fm_tipo').value,
+      tipo,
       fecha: document.getElementById('fm_fecha').value || todayISO(),
-      categoria: document.getElementById('fm_categoria').value.trim() || null,
+      categoria: tipo==='socio' ? 'Pago a socios' : (document.getElementById('fm_categoria').value.trim() || null),
+      socio: tipo==='socio' ? socio : undefined, // solo se envía en pagos a socios
       concepto: document.getElementById('fm_concepto').value.trim() || null,
       monto,
       metodoPago: document.getElementById('fm_metodo').value,
@@ -3573,8 +3653,13 @@ function openMovimientoModal(id, tipoDefault){
     };
     if(editing){ await dbUpdate('fin_movimientos', m.id, data); Object.assign(m, data); }
     else { const created = await dbInsert('fin_movimientos', {id:uid(), ...data, createdBy: CURRENT_USER_EMAIL}); STATE.fin.movimientos.push(created); }
-    finMes = data.fecha.slice(0,7);
-    closeModal(); finTab = 'movimientos'; goTo('finanzas'); toast(editing ? 'Movimiento actualizado' : (data.tipo==='gasto' ? 'Gasto registrado' : 'Ingreso registrado'));
+    closeModal();
+    if(finTab!=='resumen') finTab = 'movimientos';
+    // Si estás viendo un mes distinto al del movimiento, pasa a "Todos los meses" para que no "desaparezca" nada.
+    if(finMovMes && finMovMes!==data.fecha.slice(0,7)) finMovMes = '';
+    if(finTipoFiltro && finTipoFiltro!==tipo) finTipoFiltro = '';
+    goTo('finanzas');
+    toast(editing ? 'Movimiento actualizado' : (tipo==='gasto' ? 'Gasto registrado' : tipo==='socio' ? 'Pago a socio registrado' : 'Ingreso registrado'));
   };
 }
 
