@@ -678,6 +678,9 @@ const TABLE_MAPS = {
   facturas: { clienteId:'cliente_id', producto:'producto', concepto:'concepto', monto:'monto', fechaEmision:'fecha_emision', fechaVenc:'fecha_venc', estado:'estado' },
   agenda: { clienteId:'cliente_id', tipo:'tipo', fecha:'fecha', hora:'hora', duracion:'duracion', modalidad:'modalidad', estado:'estado', notas:'notas', profesor:'profesor' },
   cotizaciones: { numero:'numero', fecha:'fecha', validezDias:'validez_dias', estado:'estado', clienteId:'cliente_id', clienteNombre:'cliente_nombre', clienteContacto:'cliente_contacto', clienteEmail:'cliente_email', consultorNombre:'consultor_nombre', consultorCargo:'consultor_cargo', consultorContacto:'consultor_contacto', tipoServicio:'tipo_servicio', titulo:'titulo', resumen:'resumen', fases:'fases', items:'items', ivaPct:'iva_pct', formaPago:'forma_pago', tiempoEjecucion:'tiempo_ejecucion', notasAdicionales:'notas_adicionales' },
+  fin_movimientos: { tipo:'tipo', fecha:'fecha', categoria:'categoria', concepto:'concepto', monto:'monto', metodoPago:'metodo_pago', notas:'notas', createdBy:'created_by' },
+  fin_prestamos: { deudor:'deudor', documento:'documento', telefono:'telefono', capital:'capital', tasaMensual:'tasa_mensual', fechaDesembolso:'fecha_desembolso', estado:'estado', fechaCierre:'fecha_cierre', notas:'notas' },
+  fin_prestamo_pagos: { prestamoId:'prestamo_id', tipo:'tipo', fecha:'fecha', monto:'monto', periodo:'periodo', notas:'notas' },
   productos: { slug:'slug', tipo:'tipo', nombre:'nombre', etiqueta:'etiqueta', descripcion:'descripcion', segmentos:'segmentos', planes:'planes', incluye:'incluye', color:'color', orden:'orden', activo:'activo' },
 };
 const DATA_TABLES = ['clientes','ventas','facturas','agenda','cotizaciones','productos'];
@@ -767,8 +770,10 @@ async function fetchAllFromTables(){
     dbFetchAll('clientes'), dbFetchAll('ventas'), dbFetchAll('facturas'), dbFetchAll('agenda'), dbFetchAll('cotizaciones'), loadConfigRow(),
     dbFetchAllSafe('clases_catalogo'), dbFetchAllSafe('progreso'), dbFetchAllSafe('horarios'), dbFetchAllSafe('productos'),
   ]);
+  // Finanzas: solo se consulta para administradores (la base de datos además lo restringe con RLS).
+  const fin = CURRENT_USER_ROLE==='admin' ? await loadFinanzas() : { ready:false, movimientos:[], prestamos:[], pagos:[] };
   return {
-    clientes, ventas, facturas, agenda, cotizaciones, clasesCatalogo, progreso, horarios,
+    clientes, ventas, facturas, agenda, cotizaciones, clasesCatalogo, progreso, horarios, fin,
     productos: productos.length ? productos.sort((a,b)=>(a.orden||0)-(b.orden||0)) : seedData().productos,
     cotizacionSeq: configRow ? (configRow.cotizacion_seq || 1) : 1,
     config: configRow ? configRowToObj(configRow) : { empresa:'Taseca Software', moneda:'COP', consultorNombre:'Equipo Comercial', consultorCargo:'Consultor de Soluciones', consultorContacto:'contacto@taseca.tech' },
@@ -897,13 +902,14 @@ const NAV = [
   {id:'productos', label:'Productos', icon:'productos', sub:'Catálogo y planes'},
   {id:'plan-estudio', label:'Plan de Estudio', icon:'plan', sub:'Catálogo de clases y avance de estudiantes'},
   {id:'facturas', label:'Facturación', icon:'facturas', sub:'Cobros e ingresos'},
+  {id:'finanzas', label:'Finanzas', icon:'cash', sub:'Ingresos, gastos y préstamos'},
   {id:'agenda', label:'Agenda', icon:'agenda', sub:'Clases, demos y citas'},
   {id:'reportes', label:'Reportes', icon:'reportes', sub:'Indicadores del negocio'},
   {id:'config', label:'Configuración', icon:'config', sub:'Preferencias del panel'},
 ];
 
 const ROLE_NAV = {
-  admin: ['dashboard','clientes','ventas','cotizaciones','productos','plan-estudio','facturas','agenda','reportes','config'],
+  admin: ['dashboard','clientes','ventas','cotizaciones','productos','plan-estudio','facturas','finanzas','agenda','reportes','config'],
   profesor: ['dashboard','clientes','plan-estudio','agenda','productos','config'],
   contador: ['dashboard','clientes','ventas','cotizaciones','facturas','reportes','productos','config'],
 };
@@ -944,6 +950,7 @@ function renderQuickAdd(){
     productos:null,
     'plan-estudio': planEstudioTab==='catalogo' ? {label:'Nueva clase', action:()=>openClaseModal()} : null,
     facturas:{label:'Nueva factura', action:()=>openFacturaModal()},
+    finanzas: !(STATE.fin && STATE.fin.ready) ? null : finTab==='prestamos' ? {label:'Nuevo préstamo', action:()=>openPrestamoModal()} : {label:'Nuevo movimiento', action:()=>openMovimientoModal(null,'ingreso')},
     agenda:{label:'Nuevo evento', action:()=>openAgendaModal()},
     reportes:null,
     config:null,
@@ -3249,6 +3256,554 @@ document.getElementById('globalSearch').addEventListener('input', (e)=>{
 });
 
 /* =========================================================
+   FINANZAS: ingresos, gastos y préstamos (solo admin)
+   Tablas: fin_movimientos, fin_prestamos, fin_prestamo_pagos
+   (crear con supabase_finanzas.sql)
+========================================================= */
+let finTab = 'resumen'; // 'resumen' | 'movimientos' | 'prestamos'
+let finMes = todayISO().slice(0,7); // YYYY-MM
+let finTipoFiltro = '';
+let finPrestamoFiltro = 'Activo';
+
+const FIN_CATEGORIAS = {
+  ingreso: ['Mentorías','Clases Excel','Clases Power BI','Software / Suscripciones','Consultoría','Otros ingresos'],
+  gasto: ['Nómina / Honorarios','Arriendo','Servicios públicos','Internet / Telefonía','Software / Herramientas','Publicidad','Transporte','Impuestos','Comisiones bancarias','Otros gastos'],
+};
+const FIN_METODOS = ['Efectivo','Transferencia','Nequi','Daviplata','Tarjeta','Otro'];
+const MESES_CORTOS = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+
+async function loadFinanzas(){
+  try{
+    const [movimientos, prestamos, pagos] = await Promise.all([
+      dbFetchAll('fin_movimientos'), dbFetchAll('fin_prestamos'), dbFetchAll('fin_prestamo_pagos'),
+    ]);
+    return { ready:true, movimientos, prestamos, pagos };
+  }catch(e){
+    console.warn('Tablas de finanzas no disponibles (¿corriste supabase_finanzas.sql?)', e);
+    return { ready:false, movimientos:[], prestamos:[], pagos:[] };
+  }
+}
+
+// Suma n meses a una fecha ISO; si el día no existe en el mes destino, usa el último día del mes.
+function addMonthsISO(iso, n){
+  const [y, m, d] = iso.split('-').map(Number);
+  const target = new Date(Date.UTC(y, m-1+n, 1));
+  const lastDay = new Date(Date.UTC(target.getUTCFullYear(), target.getUTCMonth()+1, 0)).getUTCDate();
+  target.setUTCDate(Math.min(d, lastDay));
+  return target.toISOString().slice(0,10);
+}
+function mesLabel(ym){
+  const [y, m] = ym.split('-').map(Number);
+  return MESES_CORTOS[m-1] + ' ' + y;
+}
+function interesMensual(p){
+  return Math.round((Number(p.capital)||0) * (Number(p.tasaMensual)||0) / 100);
+}
+
+// Estado calculado de un préstamo: cuotas de interés causadas, pagadas, vencidas y próxima.
+function prestamoInfo(p){
+  const pagos = STATE.fin.pagos.filter(x=>x.prestamoId===p.id);
+  const pagosInteres = pagos.filter(x=>x.tipo==='interes');
+  const pagosCapital = pagos.filter(x=>x.tipo==='capital');
+  const cuota = interesMensual(p);
+  const cerrado = p.estado==='Pagado';
+  const limite = cerrado && p.fechaCierre ? p.fechaCierre : todayISO();
+
+  let causadas = 0;
+  while(causadas < 600 && addMonthsISO(p.fechaDesembolso, causadas+1) <= limite) causadas++;
+
+  const pagadas = new Set(pagosInteres.map(x=>Number(x.periodo)).filter(Boolean));
+  const vencidas = [];
+  for(let n=1; n<=causadas; n++) if(!pagadas.has(n)) vencidas.push(n);
+
+  let proxima = null;
+  if(!cerrado){
+    let n = 1;
+    while(pagadas.has(n)) n++;
+    proxima = { periodo:n, fecha:addMonthsISO(p.fechaDesembolso, n) };
+  }
+  return {
+    pagos, pagosInteres, pagosCapital, cuota, causadas, pagadas, vencidas, proxima,
+    interesCobrado: pagosInteres.reduce((s,x)=>s+Number(x.monto||0),0),
+    capitalPagado: pagosCapital.reduce((s,x)=>s+Number(x.monto||0),0),
+    interesVencido: vencidas.length * cuota,
+  };
+}
+function prestamoEstadoBadge(p, info){
+  if(p.estado==='Pagado') return '<span class="badge badge-gray"><span class="badge-dot"></span>Finalizado</span>';
+  if(info.vencidas.length) return `<span class="badge badge-red"><span class="badge-dot"></span>En mora (${info.vencidas.length})</span>`;
+  return '<span class="badge badge-green"><span class="badge-dot"></span>Al día</span>';
+}
+
+function finTotalesMes(ym){
+  const movs = STATE.fin.movimientos.filter(m=>(m.fecha||'').slice(0,7)===ym);
+  const ingresos = movs.filter(m=>m.tipo==='ingreso').reduce((s,m)=>s+Number(m.monto||0),0);
+  const gastos = movs.filter(m=>m.tipo==='gasto').reduce((s,m)=>s+Number(m.monto||0),0);
+  const intereses = STATE.fin.pagos.filter(x=>x.tipo==='interes' && (x.fecha||'').slice(0,7)===ym).reduce((s,x)=>s+Number(x.monto||0),0);
+  return { ingresos, gastos, intereses, balance: ingresos + intereses - gastos };
+}
+
+function RENDER_FINANZAS(){
+  if(!STATE.fin || !STATE.fin.ready){
+    document.getElementById('view').innerHTML = `
+      <div class="card"><div class="empty-state">${ICONS.empty}
+        <div>Para activar este módulo corre <b>supabase_finanzas.sql</b> en el SQL Editor de Supabase y recarga el panel.</div>
+      </div></div>`;
+    return;
+  }
+  document.getElementById('view').innerHTML = `
+    <div class="pill-tabs" style="margin-bottom:18px;">
+      <button class="pill-tab ${finTab==='resumen'?'active':''}" data-fintab="resumen">Resumen</button>
+      <button class="pill-tab ${finTab==='movimientos'?'active':''}" data-fintab="movimientos">Ingresos y gastos</button>
+      <button class="pill-tab ${finTab==='prestamos'?'active':''}" data-fintab="prestamos">Préstamos</button>
+    </div>
+    <div id="finBody"></div>
+  `;
+  document.querySelectorAll('[data-fintab]').forEach(b=>b.onclick = ()=>{ finTab = b.dataset.fintab; goTo('finanzas'); });
+  if(finTab==='movimientos') renderFinMovimientos();
+  else if(finTab==='prestamos') renderFinPrestamos();
+  else renderFinResumen();
+}
+
+/* ---------- Resumen ---------- */
+function renderFinResumen(){
+  const t = finTotalesMes(finMes);
+  const activos = STATE.fin.prestamos.filter(p=>p.estado!=='Pagado');
+  const infos = activos.map(p=>({p, info:prestamoInfo(p)}));
+  const capitalActivo = activos.reduce((s,p)=>s+Number(p.capital||0),0);
+  const interesVencido = infos.reduce((s,x)=>s+x.info.interesVencido,0);
+  const interesMensualEsperado = infos.reduce((s,x)=>s+x.info.cuota,0);
+
+  const meses = [];
+  for(let i=5; i>=0; i--) meses.push(addMonthsISO(finMes+'-01', -i).slice(0,7));
+  const filasMeses = meses.map(ym=>({ym, ...finTotalesMes(ym)}));
+
+  const proximos = infos.filter(x=>x.info.proxima)
+    .sort((a,b)=>a.info.proxima.fecha.localeCompare(b.info.proxima.fecha));
+
+  document.getElementById('finBody').innerHTML = `
+    <div class="toolbar">
+      <div class="toolbar-left">
+        <label class="cell-dim" for="finMesResumen">Mes</label>
+        <input type="month" class="filter" id="finMesResumen" value="${finMes}">
+      </div>
+    </div>
+    <div class="grid grid-4" style="margin-bottom:18px;">
+      <div class="card kpi"><div class="label">Ingresos del mes</div><div class="value" style="color:var(--ok)">${formatCOP(t.ingresos)}</div><div class="delta">Sin contar intereses</div></div>
+      <div class="card kpi"><div class="label">Intereses cobrados</div><div class="value" style="color:var(--accent)">${formatCOP(t.intereses)}</div><div class="delta">Pagos de préstamos en el mes</div></div>
+      <div class="card kpi"><div class="label">Gastos del mes</div><div class="value" style="color:var(--danger)">${formatCOP(t.gastos)}</div></div>
+      <div class="card kpi"><div class="label">Balance del mes</div><div class="value" style="color:${t.balance>=0?'var(--ok)':'var(--danger)'}">${formatCOP(t.balance)}</div><div class="delta">Ingresos + intereses − gastos</div></div>
+    </div>
+    <div class="grid grid-3" style="margin-bottom:18px;">
+      <div class="card kpi"><div class="label">Capital prestado vigente</div><div class="value">${formatCOP(capitalActivo)}</div><div class="delta">${activos.length} préstamo(s) activo(s)</div></div>
+      <div class="card kpi"><div class="label">Interés mensual esperado</div><div class="value">${formatCOP(interesMensualEsperado)}</div></div>
+      <div class="card kpi"><div class="label">Intereses vencidos por cobrar</div><div class="value" style="color:${interesVencido?'var(--danger)':'var(--text)'}">${formatCOP(interesVencido)}</div></div>
+    </div>
+    <div class="grid grid-2">
+      <div class="card">
+        <h3 style="margin:0 0 12px;font-size:14px;">Últimos 6 meses</h3>
+        <div class="table-wrap"><table>
+          <thead><tr><th>Mes</th><th>Ingresos</th><th>Intereses</th><th>Gastos</th><th>Balance</th></tr></thead>
+          <tbody>${filasMeses.map(r=>`
+            <tr>
+              <td class="cell-strong">${mesLabel(r.ym)}</td>
+              <td>${formatCOP(r.ingresos)}</td>
+              <td>${formatCOP(r.intereses)}</td>
+              <td>${formatCOP(r.gastos)}</td>
+              <td class="cell-strong" style="color:${r.balance>=0?'var(--ok)':'var(--danger)'}">${formatCOP(r.balance)}</td>
+            </tr>`).join('')}
+          </tbody>
+        </table></div>
+      </div>
+      <div class="card">
+        <h3 style="margin:0 0 12px;font-size:14px;">Próximos cobros de interés</h3>
+        ${proximos.length ? proximos.map(({p, info})=>{
+          const dias = daysBetween(info.proxima.fecha);
+          const cuando = dias<0 ? `<span style="color:var(--danger);font-weight:700;">Vencida hace ${-dias} día(s)</span>` : dias===0 ? '<span style="color:var(--warn);font-weight:700;">Hoy</span>' : `En ${dias} día(s)`;
+          return `<div style="display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--border);">
+            <div><div class="cell-strong">${escapeHtml(p.deudor)}</div><div class="cell-dim">Cuota ${info.proxima.periodo} · ${formatDate(info.proxima.fecha)} · ${cuando}</div></div>
+            <div class="cell-strong">${formatCOP(info.cuota)}</div>
+          </div>`;
+        }).join('') : `<div class="empty-state">${ICONS.empty}<div>No hay préstamos activos</div></div>`}
+      </div>
+    </div>
+  `;
+  document.getElementById('finMesResumen').addEventListener('change', e=>{ if(e.target.value){ finMes = e.target.value; renderFinResumen(); } });
+}
+
+/* ---------- Ingresos y gastos ---------- */
+function renderFinMovimientos(){
+  const rows = STATE.fin.movimientos
+    .filter(m=>(m.fecha||'').slice(0,7)===finMes && (!finTipoFiltro || m.tipo===finTipoFiltro))
+    .sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||''));
+  const t = finTotalesMes(finMes);
+
+  document.getElementById('finBody').innerHTML = `
+    <div class="grid grid-3" style="margin-bottom:18px;">
+      <div class="card kpi"><div class="label">Ingresos (${mesLabel(finMes)})</div><div class="value" style="color:var(--ok)">${formatCOP(t.ingresos)}</div></div>
+      <div class="card kpi"><div class="label">Gastos (${mesLabel(finMes)})</div><div class="value" style="color:var(--danger)">${formatCOP(t.gastos)}</div></div>
+      <div class="card kpi"><div class="label">Diferencia</div><div class="value" style="color:${t.ingresos-t.gastos>=0?'var(--ok)':'var(--danger)'}">${formatCOP(t.ingresos-t.gastos)}</div><div class="delta">No incluye intereses de préstamos</div></div>
+    </div>
+    <div class="card">
+      <div class="toolbar">
+        <div class="toolbar-left">
+          <input type="month" class="filter" id="finMesMov" value="${finMes}">
+          <select class="filter" id="finTipoMov">
+            <option value="">Ingresos y gastos</option>
+            <option value="ingreso" ${finTipoFiltro==='ingreso'?'selected':''}>Solo ingresos</option>
+            <option value="gasto" ${finTipoFiltro==='gasto'?'selected':''}>Solo gastos</option>
+          </select>
+        </div>
+        <div class="toolbar-left">
+          <button class="btn btn-outline btn-sm" id="finNuevoIngreso">${ICONS.plus} Ingreso</button>
+          <button class="btn btn-outline btn-sm" id="finNuevoGasto">${ICONS.plus} Gasto</button>
+        </div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Fecha</th><th>Tipo</th><th>Categoría</th><th>Concepto</th><th>Método</th><th style="text-align:right;">Monto</th><th></th></tr></thead>
+          <tbody>
+            ${rows.length ? rows.map(m=>`
+              <tr>
+                <td class="cell-dim">${formatDate(m.fecha)}</td>
+                <td>${m.tipo==='ingreso' ? '<span class="badge badge-green"><span class="badge-dot"></span>Ingreso</span>' : '<span class="badge badge-red"><span class="badge-dot"></span>Gasto</span>'}</td>
+                <td>${escapeHtml(m.categoria||'—')}</td>
+                <td class="cell-dim">${escapeHtml(m.concepto||'')}</td>
+                <td class="cell-dim">${escapeHtml(m.metodoPago||'—')}</td>
+                <td class="cell-strong" style="text-align:right;color:${m.tipo==='ingreso'?'var(--ok)':'var(--danger)'}">${m.tipo==='ingreso'?'+':'−'} ${formatCOP(m.monto)}</td>
+                <td><div class="row-actions">
+                  <button class="icon-btn" data-finmov-edit="${m.id}">${ICONS.edit}</button>
+                  <button class="icon-btn danger" data-finmov-del="${m.id}">${ICONS.trash}</button>
+                </div></td>
+              </tr>`).join('') : `<tr><td colspan="7"><div class="empty-state">${ICONS.empty}<div>No hay movimientos en ${mesLabel(finMes)}</div></div></td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+  document.getElementById('finMesMov').addEventListener('change', e=>{ if(e.target.value){ finMes = e.target.value; renderFinMovimientos(); } });
+  document.getElementById('finTipoMov').addEventListener('change', e=>{ finTipoFiltro = e.target.value; renderFinMovimientos(); });
+  document.getElementById('finNuevoIngreso').onclick = ()=>openMovimientoModal(null, 'ingreso');
+  document.getElementById('finNuevoGasto').onclick = ()=>openMovimientoModal(null, 'gasto');
+  document.querySelectorAll('[data-finmov-edit]').forEach(b=>b.addEventListener('click', ()=>openMovimientoModal(b.dataset.finmovEdit)));
+  document.querySelectorAll('[data-finmov-del]').forEach(b=>b.addEventListener('click', ()=>{
+    confirmDialog('¿Eliminar este movimiento?', async ()=>{
+      await dbDelete('fin_movimientos', b.dataset.finmovDel);
+      STATE.fin.movimientos = STATE.fin.movimientos.filter(x=>x.id!==b.dataset.finmovDel);
+      renderFinMovimientos(); toast('Movimiento eliminado');
+    });
+  }));
+}
+
+function openMovimientoModal(id, tipoDefault){
+  const editing = !!id;
+  const m = editing ? STATE.fin.movimientos.find(x=>x.id===id)
+    : { tipo: tipoDefault||'ingreso', fecha: todayISO(), categoria:'', concepto:'', monto:0, metodoPago:'Transferencia', notas:'' };
+  const catOptions = tipo => FIN_CATEGORIAS[tipo].map(c=>`<option value="${escapeHtml(c)}">`).join('');
+  openModal(editing ? 'Editar movimiento' : (m.tipo==='gasto' ? 'Nuevo gasto' : 'Nuevo ingreso'), `
+    <div class="form-row">
+      <div class="form-group"><label>Tipo</label>
+        <select id="fm_tipo">
+          <option value="ingreso" ${m.tipo==='ingreso'?'selected':''}>Ingreso</option>
+          <option value="gasto" ${m.tipo==='gasto'?'selected':''}>Gasto</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Fecha</label><input id="fm_fecha" type="date" value="${m.fecha||todayISO()}"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Categoría</label><input id="fm_categoria" list="fm_cat_list" value="${escapeHtml(m.categoria||'')}" placeholder="Escribe o elige"><datalist id="fm_cat_list">${catOptions(m.tipo)}</datalist></div>
+      <div class="form-group"><label>Monto (COP)</label><input id="fm_monto" type="number" min="0" step="1000" value="${m.monto||0}"></div>
+    </div>
+    <div class="form-group"><label>Concepto</label><input id="fm_concepto" value="${escapeHtml(m.concepto||'')}" placeholder="Ej: Mentoría Power BI - mes 2"></div>
+    <div class="form-group"><label>Método de pago</label>
+      <select id="fm_metodo">${FIN_METODOS.map(x=>`<option ${m.metodoPago===x?'selected':''}>${x}</option>`).join('')}</select>
+    </div>
+    <div class="form-group"><label>Notas</label><textarea id="fm_notas" rows="2">${escapeHtml(m.notas||'')}</textarea></div>
+  `, `
+    <button class="btn btn-outline" id="cancelBtn">Cancelar</button>
+    <button class="btn btn-primary" id="saveBtn">${ICONS.check} Guardar</button>
+  `);
+  document.getElementById('fm_tipo').addEventListener('change', e=>{
+    document.getElementById('fm_cat_list').innerHTML = catOptions(e.target.value);
+  });
+  document.getElementById('cancelBtn').onclick = closeModal;
+  document.getElementById('saveBtn').onclick = async ()=>{
+    const monto = Number(document.getElementById('fm_monto').value)||0;
+    if(monto<=0){ toast('Ingresa un monto mayor a 0'); return; }
+    const data = {
+      tipo: document.getElementById('fm_tipo').value,
+      fecha: document.getElementById('fm_fecha').value || todayISO(),
+      categoria: document.getElementById('fm_categoria').value.trim() || null,
+      concepto: document.getElementById('fm_concepto').value.trim() || null,
+      monto,
+      metodoPago: document.getElementById('fm_metodo').value,
+      notas: document.getElementById('fm_notas').value.trim() || null,
+    };
+    if(editing){ await dbUpdate('fin_movimientos', m.id, data); Object.assign(m, data); }
+    else { const created = await dbInsert('fin_movimientos', {id:uid(), ...data, createdBy: CURRENT_USER_EMAIL}); STATE.fin.movimientos.push(created); }
+    finMes = data.fecha.slice(0,7);
+    closeModal(); finTab = 'movimientos'; goTo('finanzas'); toast(editing ? 'Movimiento actualizado' : (data.tipo==='gasto' ? 'Gasto registrado' : 'Ingreso registrado'));
+  };
+}
+
+/* ---------- Préstamos ---------- */
+function renderFinPrestamos(){
+  const lista = STATE.fin.prestamos
+    .filter(p=> !finPrestamoFiltro || p.estado===finPrestamoFiltro)
+    .sort((a,b)=>(b.fechaDesembolso||'').localeCompare(a.fechaDesembolso||''));
+  const activos = STATE.fin.prestamos.filter(p=>p.estado!=='Pagado');
+  const capitalActivo = activos.reduce((s,p)=>s+Number(p.capital||0),0);
+  const interesCobradoTotal = STATE.fin.pagos.filter(x=>x.tipo==='interes').reduce((s,x)=>s+Number(x.monto||0),0);
+  const vencidoTotal = activos.reduce((s,p)=>s+prestamoInfo(p).interesVencido,0);
+
+  document.getElementById('finBody').innerHTML = `
+    <div class="grid grid-3" style="margin-bottom:18px;">
+      <div class="card kpi"><div class="label">Capital prestado vigente</div><div class="value">${formatCOP(capitalActivo)}</div><div class="delta">${activos.length} préstamo(s) activo(s)</div></div>
+      <div class="card kpi"><div class="label">Intereses cobrados (histórico)</div><div class="value" style="color:var(--ok)">${formatCOP(interesCobradoTotal)}</div></div>
+      <div class="card kpi"><div class="label">Intereses vencidos</div><div class="value" style="color:${vencidoTotal?'var(--danger)':'var(--text)'}">${formatCOP(vencidoTotal)}</div></div>
+    </div>
+    <div class="card">
+      <div class="toolbar">
+        <div class="toolbar-left">
+          <select class="filter" id="finFiltroPrestamo">
+            <option value="Activo" ${finPrestamoFiltro==='Activo'?'selected':''}>Activos</option>
+            <option value="Pagado" ${finPrestamoFiltro==='Pagado'?'selected':''}>Finalizados</option>
+            <option value="" ${!finPrestamoFiltro?'selected':''}>Todos</option>
+          </select>
+        </div>
+        <div style="font-size:12.5px;color:var(--text-dim);">${lista.length} préstamo(s)</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Deudor</th><th>Capital</th><th>Tasa</th><th>Interés mensual</th><th>Desembolso</th><th>Próximo pago</th><th>Cuotas pagadas</th><th>Estado</th><th></th></tr></thead>
+          <tbody>
+            ${lista.length ? lista.map(p=>{
+              const info = prestamoInfo(p);
+              return `
+              <tr>
+                <td><div class="cell-strong">${escapeHtml(p.deudor)}</div><div class="cell-dim">${escapeHtml(p.documento||'')}${p.telefono?' · '+escapeHtml(p.telefono):''}</div></td>
+                <td class="cell-strong">${formatCOP(p.capital)}</td>
+                <td>${Number(p.tasaMensual)}% mes</td>
+                <td>${formatCOP(info.cuota)}</td>
+                <td class="cell-dim">${formatDate(p.fechaDesembolso)}</td>
+                <td class="cell-dim">${info.proxima ? formatDate(info.proxima.fecha) + ' (cuota ' + info.proxima.periodo + ')' : 'Cerrado ' + formatDate(p.fechaCierre)}</td>
+                <td>${info.pagadas.size} / ${info.causadas}</td>
+                <td>${prestamoEstadoBadge(p, info)}</td>
+                <td><div class="row-actions">
+                  ${p.estado!=='Pagado' ? `<button class="btn btn-outline btn-sm" data-pr-interes="${p.id}" title="Registrar pago de interés">+ Interés</button>
+                  <button class="btn btn-outline btn-sm" data-pr-capital="${p.id}" title="Registrar pago total del capital y finalizar">Pagar capital</button>` : ''}
+                  <button class="icon-btn" data-pr-ver="${p.id}" title="Ver detalle">${ICONS.reportes||ICONS.edit}</button>
+                  <button class="icon-btn" data-pr-edit="${p.id}" title="Editar">${ICONS.edit}</button>
+                  <button class="icon-btn danger" data-pr-del="${p.id}" title="Eliminar">${ICONS.trash}</button>
+                </div></td>
+              </tr>`;
+            }).join('') : `<tr><td colspan="9"><div class="empty-state">${ICONS.empty}<div>No hay préstamos con este filtro</div></div></td></tr>`}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  `;
+  document.getElementById('finFiltroPrestamo').addEventListener('change', e=>{ finPrestamoFiltro = e.target.value; renderFinPrestamos(); });
+  document.querySelectorAll('[data-pr-interes]').forEach(b=>b.onclick = ()=>openPagoInteresModal(b.dataset.prInteres));
+  document.querySelectorAll('[data-pr-capital]').forEach(b=>b.onclick = ()=>openPagoCapitalModal(b.dataset.prCapital));
+  document.querySelectorAll('[data-pr-ver]').forEach(b=>b.onclick = ()=>openPrestamoDetalle(b.dataset.prVer));
+  document.querySelectorAll('[data-pr-edit]').forEach(b=>b.onclick = ()=>openPrestamoModal(b.dataset.prEdit));
+  document.querySelectorAll('[data-pr-del]').forEach(b=>b.onclick = ()=>{
+    confirmDialog('¿Eliminar este préstamo? También se borrarán <b>todos sus pagos registrados</b>.', async ()=>{
+      await dbDelete('fin_prestamos', b.dataset.prDel);
+      STATE.fin.prestamos = STATE.fin.prestamos.filter(x=>x.id!==b.dataset.prDel);
+      STATE.fin.pagos = STATE.fin.pagos.filter(x=>x.prestamoId!==b.dataset.prDel);
+      renderFinPrestamos(); toast('Préstamo eliminado');
+    });
+  });
+}
+
+function openPrestamoModal(id){
+  const editing = !!id;
+  const p = editing ? STATE.fin.prestamos.find(x=>x.id===id)
+    : { deudor:'', documento:'', telefono:'', capital:0, tasaMensual:5, fechaDesembolso: todayISO(), notas:'' };
+  openModal(editing ? 'Editar préstamo' : 'Nuevo préstamo', `
+    <div class="form-group"><label>Deudor (nombre)</label><input id="pr_deudor" value="${escapeHtml(p.deudor||'')}" placeholder="Nombre completo"></div>
+    <div class="form-row">
+      <div class="form-group"><label>Documento</label><input id="pr_documento" value="${escapeHtml(p.documento||'')}"></div>
+      <div class="form-group"><label>Teléfono</label><input id="pr_telefono" value="${escapeHtml(p.telefono||'')}"></div>
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Capital prestado (COP)</label><input id="pr_capital" type="number" min="0" step="10000" value="${p.capital||0}"></div>
+      <div class="form-group"><label>Interés mensual (%)</label><input id="pr_tasa" type="number" min="0" step="0.1" value="${p.tasaMensual ?? 0}"></div>
+    </div>
+    <div class="form-group"><label>Fecha de desembolso</label><input id="pr_fecha" type="date" value="${p.fechaDesembolso||todayISO()}"></div>
+    <div id="pr_resumen" class="confirm-box" style="margin-bottom:14px;"></div>
+    <div class="form-group"><label>Notas</label><textarea id="pr_notas" rows="2">${escapeHtml(p.notas||'')}</textarea></div>
+  `, `
+    <button class="btn btn-outline" id="cancelBtn">Cancelar</button>
+    <button class="btn btn-primary" id="saveBtn">${ICONS.check} Guardar</button>
+  `);
+  const actualizarResumen = ()=>{
+    const cap = Number(document.getElementById('pr_capital').value)||0;
+    const tasa = Number(document.getElementById('pr_tasa').value)||0;
+    const fecha = document.getElementById('pr_fecha').value;
+    const cuota = Math.round(cap*tasa/100);
+    document.getElementById('pr_resumen').innerHTML = cap>0 && fecha
+      ? `El deudor paga <b>${formatCOP(cuota)}</b> de interés cada mes, desde el <b>${formatDate(addMonthsISO(fecha,1))}</b>. El capital de <b>${formatCOP(cap)}</b> se paga completo al final y ahí se cierra el préstamo.`
+      : 'Ingresa el capital, la tasa y la fecha de desembolso para ver el resumen.';
+  };
+  ['pr_capital','pr_tasa','pr_fecha'].forEach(i=>document.getElementById(i).addEventListener('input', actualizarResumen));
+  actualizarResumen();
+  document.getElementById('cancelBtn').onclick = closeModal;
+  document.getElementById('saveBtn').onclick = async ()=>{
+    const deudor = document.getElementById('pr_deudor').value.trim();
+    const capital = Number(document.getElementById('pr_capital').value)||0;
+    const fechaDesembolso = document.getElementById('pr_fecha').value;
+    if(!deudor){ toast('Escribe el nombre del deudor'); return; }
+    if(capital<=0){ toast('El capital debe ser mayor a 0'); return; }
+    if(!fechaDesembolso){ toast('Elige la fecha de desembolso'); return; }
+    const data = {
+      deudor, capital, fechaDesembolso,
+      documento: document.getElementById('pr_documento').value.trim() || null,
+      telefono: document.getElementById('pr_telefono').value.trim() || null,
+      tasaMensual: Number(document.getElementById('pr_tasa').value)||0,
+      notas: document.getElementById('pr_notas').value.trim() || null,
+    };
+    if(editing){ await dbUpdate('fin_prestamos', p.id, data); Object.assign(p, data); }
+    else { const created = await dbInsert('fin_prestamos', {id:uid(), ...data, estado:'Activo'}); STATE.fin.prestamos.push(created); }
+    closeModal(); finTab = 'prestamos'; goTo('finanzas'); toast(editing ? 'Préstamo actualizado' : 'Préstamo creado');
+  };
+}
+
+function openPagoInteresModal(prestamoId){
+  const p = STATE.fin.prestamos.find(x=>x.id===prestamoId);
+  const info = prestamoInfo(p);
+  // Opciones: cuotas vencidas sin pagar + la siguiente cuota futura sin pagar.
+  const opciones = [...info.vencidas];
+  let futura = info.causadas + 1;
+  while(info.pagadas.has(futura)) futura++;
+  opciones.push(futura);
+  opciones.sort((a,b)=>a-b);
+
+  openModal('Pago de interés · ' + escapeHtml(p.deudor), `
+    ${info.vencidas.length ? `<div class="confirm-box" style="margin-bottom:14px;color:var(--danger);">Tiene <b>${info.vencidas.length}</b> cuota(s) de interés vencida(s): ${formatCOP(info.interesVencido)}.</div>` : ''}
+    <div class="form-row">
+      <div class="form-group"><label>Cuota de interés</label>
+        <select id="pi_periodo">${opciones.map(n=>`<option value="${n}">Cuota ${n} · vence ${formatDate(addMonthsISO(p.fechaDesembolso, n))}</option>`).join('')}</select>
+      </div>
+      <div class="form-group"><label>Fecha del pago</label><input id="pi_fecha" type="date" value="${todayISO()}"></div>
+    </div>
+    <div class="form-group"><label>Monto recibido (COP)</label><input id="pi_monto" type="number" min="0" step="1000" value="${info.cuota}"></div>
+    <div class="form-group"><label>Notas</label><input id="pi_notas" placeholder="Opcional"></div>
+  `, `
+    <button class="btn btn-outline" id="cancelBtn">Cancelar</button>
+    <button class="btn btn-primary" id="saveBtn">${ICONS.check} Registrar pago</button>
+  `);
+  document.getElementById('cancelBtn').onclick = closeModal;
+  document.getElementById('saveBtn').onclick = async ()=>{
+    const monto = Number(document.getElementById('pi_monto').value)||0;
+    if(monto<=0){ toast('Ingresa un monto mayor a 0'); return; }
+    const created = await dbInsert('fin_prestamo_pagos', {
+      id:uid(), prestamoId:p.id, tipo:'interes',
+      periodo: Number(document.getElementById('pi_periodo').value),
+      fecha: document.getElementById('pi_fecha').value || todayISO(),
+      monto, notas: document.getElementById('pi_notas').value.trim() || null,
+    });
+    STATE.fin.pagos.push(created);
+    closeModal(); renderFinBodyActual(); toast('Pago de interés registrado');
+  };
+}
+
+function openPagoCapitalModal(prestamoId){
+  const p = STATE.fin.prestamos.find(x=>x.id===prestamoId);
+  const info = prestamoInfo(p);
+  openModal('Pagar capital y finalizar · ' + escapeHtml(p.deudor), `
+    <div class="confirm-box" style="margin-bottom:14px;">
+      Se registrará el pago <b>completo</b> del capital (${formatCOP(p.capital)}) y el préstamo quedará <b>finalizado</b>: no se generan más cuotas de interés.
+      ${info.vencidas.length ? `<div style="margin-top:8px;color:var(--danger);">Ojo: tiene ${info.vencidas.length} cuota(s) de interés sin pagar (${formatCOP(info.interesVencido)}). Regístralas antes si ya las recibiste.</div>` : ''}
+    </div>
+    <div class="form-row">
+      <div class="form-group"><label>Fecha del pago</label><input id="pc_fecha" type="date" value="${todayISO()}"></div>
+      <div class="form-group"><label>Capital recibido (COP)</label><input id="pc_monto" type="number" value="${p.capital}" readonly></div>
+    </div>
+    <div class="form-group"><label>Notas</label><input id="pc_notas" placeholder="Opcional"></div>
+  `, `
+    <button class="btn btn-outline" id="cancelBtn">Cancelar</button>
+    <button class="btn btn-primary" id="saveBtn">${ICONS.check} Pagar capital y finalizar</button>
+  `);
+  document.getElementById('cancelBtn').onclick = closeModal;
+  document.getElementById('saveBtn').onclick = async ()=>{
+    const fecha = document.getElementById('pc_fecha').value || todayISO();
+    if(fecha < p.fechaDesembolso){ toast('La fecha no puede ser anterior al desembolso'); return; }
+    const created = await dbInsert('fin_prestamo_pagos', {
+      id:uid(), prestamoId:p.id, tipo:'capital', periodo:null, fecha,
+      monto: Number(p.capital), notas: document.getElementById('pc_notas').value.trim() || null,
+    });
+    STATE.fin.pagos.push(created);
+    await dbUpdate('fin_prestamos', p.id, { estado:'Pagado', fechaCierre: fecha });
+    Object.assign(p, { estado:'Pagado', fechaCierre: fecha });
+    closeModal(); renderFinBodyActual(); toast('Capital pagado. Préstamo finalizado');
+  };
+}
+
+function openPrestamoDetalle(prestamoId){
+  const p = STATE.fin.prestamos.find(x=>x.id===prestamoId);
+  const info = prestamoInfo(p);
+  const hasta = p.estado==='Pagado' ? info.causadas : info.causadas + 1; // en activos, muestra también la próxima cuota
+  const cuotas = [];
+  for(let n=1; n<=hasta; n++){
+    const pago = info.pagosInteres.find(x=>Number(x.periodo)===n);
+    const fecha = addMonthsISO(p.fechaDesembolso, n);
+    const estado = pago ? '<span class="badge badge-green"><span class="badge-dot"></span>Pagada</span>'
+      : n<=info.causadas ? '<span class="badge badge-red"><span class="badge-dot"></span>Vencida</span>'
+      : '<span class="badge badge-blue"><span class="badge-dot"></span>Próxima</span>';
+    cuotas.push(`<tr><td>Cuota ${n}</td><td class="cell-dim">${formatDate(fecha)}</td><td>${formatCOP(info.cuota)}</td><td>${estado}</td><td class="cell-dim">${pago ? formatCOP(pago.monto)+' el '+formatDate(pago.fecha) : ''}</td></tr>`);
+  }
+  const pagosOrdenados = [...info.pagos].sort((a,b)=>(a.fecha||'').localeCompare(b.fecha||''));
+  openModal('Préstamo · ' + escapeHtml(p.deudor), `
+    <div class="grid grid-3" style="gap:10px;margin-bottom:14px;">
+      <div class="card kpi" style="box-shadow:none;"><div class="label">Capital</div><div class="value" style="font-size:18px;">${formatCOP(p.capital)}</div></div>
+      <div class="card kpi" style="box-shadow:none;"><div class="label">Interés mensual</div><div class="value" style="font-size:18px;">${formatCOP(info.cuota)}</div><div class="delta">${Number(p.tasaMensual)}% mensual</div></div>
+      <div class="card kpi" style="box-shadow:none;"><div class="label">Interés cobrado</div><div class="value" style="font-size:18px;color:var(--ok)">${formatCOP(info.interesCobrado)}</div></div>
+    </div>
+    <div class="cell-dim" style="margin-bottom:10px;">Desembolsado el ${formatDate(p.fechaDesembolso)} · ${prestamoEstadoBadge(p, info)}${p.estado==='Pagado' ? ' · capital pagado el ' + formatDate(p.fechaCierre) : ''}</div>
+    <h4 style="margin:12px 0 8px;font-size:13px;">Cuotas de interés</h4>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Cuota</th><th>Vence</th><th>Valor</th><th>Estado</th><th>Pago</th></tr></thead>
+      <tbody>${cuotas.join('') || '<tr><td colspan="5" class="cell-dim">Aún no hay cuotas.</td></tr>'}</tbody>
+    </table></div>
+    <h4 style="margin:16px 0 8px;font-size:13px;">Pagos registrados</h4>
+    <div class="table-wrap"><table>
+      <thead><tr><th>Fecha</th><th>Tipo</th><th>Monto</th><th>Notas</th><th></th></tr></thead>
+      <tbody>${pagosOrdenados.length ? pagosOrdenados.map(x=>`
+        <tr>
+          <td class="cell-dim">${formatDate(x.fecha)}</td>
+          <td>${x.tipo==='capital' ? '<b>Capital</b>' : 'Interés · cuota ' + (x.periodo||'—')}</td>
+          <td class="cell-strong">${formatCOP(x.monto)}</td>
+          <td class="cell-dim">${escapeHtml(x.notas||'')}</td>
+          <td><button class="icon-btn danger" data-pago-del="${x.id}" title="Eliminar pago">${ICONS.trash}</button></td>
+        </tr>`).join('') : '<tr><td colspan="5" class="cell-dim">Sin pagos todavía.</td></tr>'}
+      </tbody>
+    </table></div>
+    ${p.notas ? `<div class="cell-dim" style="margin-top:12px;">Notas: ${escapeHtml(p.notas)}</div>` : ''}
+  `, `<button class="btn btn-outline" id="cancelBtn">Cerrar</button>`);
+  document.getElementById('cancelBtn').onclick = closeModal;
+  document.querySelectorAll('[data-pago-del]').forEach(b=>b.onclick = async ()=>{
+    const pago = STATE.fin.pagos.find(x=>x.id===b.dataset.pagoDel);
+    if(!pago || !window.confirm(pago.tipo==='capital' ? '¿Eliminar el pago de capital? El préstamo volverá a quedar activo.' : '¿Eliminar este pago de interés?')) return;
+    await dbDelete('fin_prestamo_pagos', pago.id);
+    STATE.fin.pagos = STATE.fin.pagos.filter(x=>x.id!==pago.id);
+    if(pago.tipo==='capital' && !STATE.fin.pagos.some(x=>x.prestamoId===p.id && x.tipo==='capital')){
+      await dbUpdate('fin_prestamos', p.id, { estado:'Activo', fechaCierre:null });
+      Object.assign(p, { estado:'Activo', fechaCierre:null });
+    }
+    toast('Pago eliminado');
+    renderFinBodyActual();
+    openPrestamoDetalle(p.id);
+  });
+}
+
+function renderFinBodyActual(){
+  if(CURRENT_VIEW==='finanzas') RENDER_FINANZAS();
+}
+
+/* =========================================================
    INIT
 ========================================================= */
 const RENDERERS = {
@@ -3259,6 +3814,7 @@ const RENDERERS = {
   productos: RENDER_PRODUCTOS,
   'plan-estudio': RENDER_PLAN_ESTUDIO,
   facturas: RENDER_FACTURAS,
+  finanzas: RENDER_FINANZAS,
   agenda: RENDER_AGENDA,
   reportes: RENDER_REPORTES,
   config: RENDER_CONFIG,
