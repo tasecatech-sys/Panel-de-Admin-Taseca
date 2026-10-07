@@ -222,6 +222,9 @@ select.filter, input.filter{
 .form-group{margin-bottom:14px;}
 .form-group label{display:block;font-size:12px;font-weight:700;color:var(--text-dim);margin-bottom:5px;}
 .form-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+.money-field{position:relative;}
+.money-field .money-prefix{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:var(--text-dim);font-weight:700;pointer-events:none;}
+.form-group .money-field input{padding-left:26px;font-variant-numeric:tabular-nums;font-weight:600;}
 .form-group input,.form-group select,.form-group textarea{
   width:100%;padding:9px 11px;border:1px solid var(--border);border-radius:9px;
   font-size:13px;font-family:inherit;outline:none;background:#fff;color:var(--text);
@@ -3272,6 +3275,34 @@ const FIN_CATEGORIAS = {
 const FIN_METODOS = ['Efectivo','Transferencia','Nequi','Daviplata','Tarjeta','Otro'];
 const MESES_CORTOS = ['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
 
+// Campos de dinero con separador de miles (150.000) mientras se escribe.
+function formatMiles(n){
+  n = Math.round(Number(n)||0);
+  return n ? n.toLocaleString('es-CO', {maximumFractionDigits:0}) : '';
+}
+function parseMoney(v){
+  return Number(String(v||'').replace(/\D/g,'')) || 0;
+}
+function moneyInputHtml(id, value, extraAttrs){
+  return `<div class="money-field"><span class="money-prefix">$</span><input id="${id}" type="text" inputmode="numeric" autocomplete="off" class="money-input" value="${formatMiles(value)}" placeholder="0" ${extraAttrs||''}></div>`;
+}
+function attachMoneyInputs(root){
+  (root||document).querySelectorAll('input.money-input').forEach(inp=>{
+    if(inp.dataset.moneyBound) return;
+    inp.dataset.moneyBound = '1';
+    inp.addEventListener('input', ()=>{
+      const pos = inp.selectionStart ?? inp.value.length;
+      const digitosAntes = inp.value.slice(0, pos).replace(/\D/g,'').length;
+      const nuevo = formatMiles(parseMoney(inp.value));
+      inp.value = nuevo;
+      let i = 0, vistos = 0;
+      while(i < nuevo.length && vistos < digitosAntes){ if(/\d/.test(nuevo[i])) vistos++; i++; }
+      try{ inp.setSelectionRange(i, i); }catch(e){}
+      inp.dispatchEvent(new CustomEvent('money-change', {bubbles:true}));
+    });
+  });
+}
+
 async function loadFinanzas(){
   try{
     const [movimientos, prestamos, pagos] = await Promise.all([
@@ -3512,7 +3543,7 @@ function openMovimientoModal(id, tipoDefault){
     </div>
     <div class="form-row">
       <div class="form-group"><label>Categoría</label><input id="fm_categoria" list="fm_cat_list" value="${escapeHtml(m.categoria||'')}" placeholder="Escribe o elige"><datalist id="fm_cat_list">${catOptions(m.tipo)}</datalist></div>
-      <div class="form-group"><label>Monto (COP)</label><input id="fm_monto" type="number" min="0" step="1000" value="${m.monto||0}"></div>
+      <div class="form-group"><label>Monto (COP)</label>${moneyInputHtml('fm_monto', m.monto)}</div>
     </div>
     <div class="form-group"><label>Concepto</label><input id="fm_concepto" value="${escapeHtml(m.concepto||'')}" placeholder="Ej: Mentoría Power BI - mes 2"></div>
     <div class="form-group"><label>Método de pago</label>
@@ -3523,12 +3554,13 @@ function openMovimientoModal(id, tipoDefault){
     <button class="btn btn-outline" id="cancelBtn">Cancelar</button>
     <button class="btn btn-primary" id="saveBtn">${ICONS.check} Guardar</button>
   `);
+  attachMoneyInputs();
   document.getElementById('fm_tipo').addEventListener('change', e=>{
     document.getElementById('fm_cat_list').innerHTML = catOptions(e.target.value);
   });
   document.getElementById('cancelBtn').onclick = closeModal;
   document.getElementById('saveBtn').onclick = async ()=>{
-    const monto = Number(document.getElementById('fm_monto').value)||0;
+    const monto = parseMoney(document.getElementById('fm_monto').value);
     if(monto<=0){ toast('Ingresa un monto mayor a 0'); return; }
     const data = {
       tipo: document.getElementById('fm_tipo').value,
@@ -3629,7 +3661,7 @@ function openPrestamoModal(id){
       <div class="form-group"><label>Teléfono</label><input id="pr_telefono" value="${escapeHtml(p.telefono||'')}"></div>
     </div>
     <div class="form-row">
-      <div class="form-group"><label>Capital prestado (COP)</label><input id="pr_capital" type="number" min="0" step="10000" value="${p.capital||0}"></div>
+      <div class="form-group"><label>Capital prestado (COP)</label>${moneyInputHtml('pr_capital', p.capital)}</div>
       <div class="form-group"><label>Interés mensual (%)</label><input id="pr_tasa" type="number" min="0" step="0.1" value="${p.tasaMensual ?? 0}"></div>
     </div>
     <div class="form-group"><label>Fecha de desembolso</label><input id="pr_fecha" type="date" value="${p.fechaDesembolso||todayISO()}"></div>
@@ -3640,7 +3672,7 @@ function openPrestamoModal(id){
     <button class="btn btn-primary" id="saveBtn">${ICONS.check} Guardar</button>
   `);
   const actualizarResumen = ()=>{
-    const cap = Number(document.getElementById('pr_capital').value)||0;
+    const cap = parseMoney(document.getElementById('pr_capital').value);
     const tasa = Number(document.getElementById('pr_tasa').value)||0;
     const fecha = document.getElementById('pr_fecha').value;
     const cuota = Math.round(cap*tasa/100);
@@ -3648,12 +3680,13 @@ function openPrestamoModal(id){
       ? `El deudor paga <b>${formatCOP(cuota)}</b> de interés cada mes, desde el <b>${formatDate(addMonthsISO(fecha,1))}</b>. El capital de <b>${formatCOP(cap)}</b> se paga completo al final y ahí se cierra el préstamo.`
       : 'Ingresa el capital, la tasa y la fecha de desembolso para ver el resumen.';
   };
+  attachMoneyInputs();
   ['pr_capital','pr_tasa','pr_fecha'].forEach(i=>document.getElementById(i).addEventListener('input', actualizarResumen));
   actualizarResumen();
   document.getElementById('cancelBtn').onclick = closeModal;
   document.getElementById('saveBtn').onclick = async ()=>{
     const deudor = document.getElementById('pr_deudor').value.trim();
-    const capital = Number(document.getElementById('pr_capital').value)||0;
+    const capital = parseMoney(document.getElementById('pr_capital').value);
     const fechaDesembolso = document.getElementById('pr_fecha').value;
     if(!deudor){ toast('Escribe el nombre del deudor'); return; }
     if(capital<=0){ toast('El capital debe ser mayor a 0'); return; }
@@ -3689,15 +3722,16 @@ function openPagoInteresModal(prestamoId){
       </div>
       <div class="form-group"><label>Fecha del pago</label><input id="pi_fecha" type="date" value="${todayISO()}"></div>
     </div>
-    <div class="form-group"><label>Monto recibido (COP)</label><input id="pi_monto" type="number" min="0" step="1000" value="${info.cuota}"></div>
+    <div class="form-group"><label>Monto recibido (COP)</label>${moneyInputHtml('pi_monto', info.cuota)}</div>
     <div class="form-group"><label>Notas</label><input id="pi_notas" placeholder="Opcional"></div>
   `, `
     <button class="btn btn-outline" id="cancelBtn">Cancelar</button>
     <button class="btn btn-primary" id="saveBtn">${ICONS.check} Registrar pago</button>
   `);
+  attachMoneyInputs();
   document.getElementById('cancelBtn').onclick = closeModal;
   document.getElementById('saveBtn').onclick = async ()=>{
-    const monto = Number(document.getElementById('pi_monto').value)||0;
+    const monto = parseMoney(document.getElementById('pi_monto').value);
     if(monto<=0){ toast('Ingresa un monto mayor a 0'); return; }
     const created = await dbInsert('fin_prestamo_pagos', {
       id:uid(), prestamoId:p.id, tipo:'interes',
@@ -3720,7 +3754,7 @@ function openPagoCapitalModal(prestamoId){
     </div>
     <div class="form-row">
       <div class="form-group"><label>Fecha del pago</label><input id="pc_fecha" type="date" value="${todayISO()}"></div>
-      <div class="form-group"><label>Capital recibido (COP)</label><input id="pc_monto" type="number" value="${p.capital}" readonly></div>
+      <div class="form-group"><label>Capital recibido (COP)</label>${moneyInputHtml('pc_monto', p.capital, 'readonly')}</div>
     </div>
     <div class="form-group"><label>Notas</label><input id="pc_notas" placeholder="Opcional"></div>
   `, `
