@@ -681,7 +681,7 @@ const TABLE_MAPS = {
   facturas: { clienteId:'cliente_id', producto:'producto', concepto:'concepto', monto:'monto', fechaEmision:'fecha_emision', fechaVenc:'fecha_venc', estado:'estado' },
   agenda: { clienteId:'cliente_id', tipo:'tipo', fecha:'fecha', hora:'hora', duracion:'duracion', modalidad:'modalidad', estado:'estado', notas:'notas', profesor:'profesor' },
   cotizaciones: { numero:'numero', fecha:'fecha', validezDias:'validez_dias', estado:'estado', clienteId:'cliente_id', clienteNombre:'cliente_nombre', clienteContacto:'cliente_contacto', clienteEmail:'cliente_email', consultorNombre:'consultor_nombre', consultorCargo:'consultor_cargo', consultorContacto:'consultor_contacto', tipoServicio:'tipo_servicio', titulo:'titulo', resumen:'resumen', fases:'fases', items:'items', ivaPct:'iva_pct', formaPago:'forma_pago', tiempoEjecucion:'tiempo_ejecucion', notasAdicionales:'notas_adicionales' },
-  fin_movimientos: { tipo:'tipo', fecha:'fecha', categoria:'categoria', concepto:'concepto', monto:'monto', metodoPago:'metodo_pago', notas:'notas', socio:'socio', createdBy:'created_by', createdAt:'created_at' },
+  fin_movimientos: { tipo:'tipo', fecha:'fecha', categoria:'categoria', concepto:'concepto', monto:'monto', metodoPago:'metodo_pago', notas:'notas', socio:'socio', createdBy:'created_by', createdAt:'created_at', estado:'estado', aprobadoPor:'aprobado_por', aprobadoAt:'aprobado_at', motivoRechazo:'motivo_rechazo' },
   fin_prestamos: { deudor:'deudor', documento:'documento', telefono:'telefono', capital:'capital', tasaMensual:'tasa_mensual', fechaDesembolso:'fecha_desembolso', estado:'estado', fechaCierre:'fecha_cierre', notas:'notas' },
   fin_prestamo_pagos: { prestamoId:'prestamo_id', tipo:'tipo', fecha:'fecha', monto:'monto', periodo:'periodo', notas:'notas' },
   productos: { slug:'slug', tipo:'tipo', nombre:'nombre', etiqueta:'etiqueta', descripcion:'descripcion', segmentos:'segmentos', planes:'planes', incluye:'incluye', color:'color', orden:'orden', activo:'activo' },
@@ -774,7 +774,7 @@ async function fetchAllFromTables(){
     dbFetchAllSafe('clases_catalogo'), dbFetchAllSafe('progreso'), dbFetchAllSafe('horarios'), dbFetchAllSafe('productos'),
   ]);
   // Finanzas: solo se consulta para administradores (la base de datos además lo restringe con RLS).
-  const fin = CURRENT_USER_ROLE==='admin' ? await loadFinanzas() : { ready:false, movimientos:[], prestamos:[], pagos:[] };
+  const fin = (CURRENT_USER_ROLE==='admin' || CURRENT_USER_ROLE==='aprobador') ? await loadFinanzas() : { ready:false, movimientos:[], prestamos:[], pagos:[] };
   return {
     clientes, ventas, facturas, agenda, cotizaciones, clasesCatalogo, progreso, horarios, fin,
     productos: productos.length ? productos.sort((a,b)=>(a.orden||0)-(b.orden||0)) : seedData().productos,
@@ -915,6 +915,7 @@ const ROLE_NAV = {
   admin: ['dashboard','clientes','ventas','cotizaciones','productos','plan-estudio','facturas','finanzas','agenda','reportes','config'],
   profesor: ['dashboard','clientes','plan-estudio','agenda','productos','config'],
   contador: ['dashboard','clientes','ventas','cotizaciones','facturas','reportes','productos','config'],
+  aprobador: ['finanzas','config'],
 };
 function allowedViews(){
   return ROLE_NAV[CURRENT_USER_ROLE] || ROLE_NAV.admin;
@@ -933,7 +934,7 @@ function renderNav(){
 }
 
 function goTo(view){
-  if(!allowedViews().includes(view)) view = 'dashboard';
+  if(!allowedViews().includes(view)) view = allowedViews()[0];
   CURRENT_VIEW = view;
   const meta = NAV.find(n=>n.id===view);
   document.getElementById('viewTitle').textContent = meta.label;
@@ -953,7 +954,7 @@ function renderQuickAdd(){
     productos:null,
     'plan-estudio': planEstudioTab==='catalogo' ? {label:'Nueva clase', action:()=>openClaseModal()} : null,
     facturas:{label:'Nueva factura', action:()=>openFacturaModal()},
-    finanzas: !(STATE.fin && STATE.fin.ready) ? null : finTab==='prestamos' ? {label:'Nuevo préstamo', action:()=>openPrestamoModal()} : {label:'Nuevo movimiento', action:()=>openMovimientoModal(null,'ingreso')},
+    finanzas: !(STATE.fin && STATE.fin.ready) || !finPuedeEditar() ? null : finTab==='prestamos' ? {label:'Nuevo préstamo', action:()=>openPrestamoModal()} : {label:'Nuevo movimiento', action:()=>openMovimientoModal(null,'ingreso')},
     agenda:{label:'Nuevo evento', action:()=>openAgendaModal()},
     reportes:null,
     config:null,
@@ -3089,6 +3090,7 @@ function RENDER_CONFIG(){
           <select id="st_rol">
             <option value="profesor">Profesor</option>
             <option value="contador">Contador</option>
+            <option value="aprobador">Aprobador de finanzas</option>
             <option value="admin">Administrador</option>
           </select>
         </div>
@@ -3145,7 +3147,7 @@ async function loadMiPerfil(){
   };
 }
 
-const STAFF_ROL_LABEL = { admin:'Administrador', profesor:'Profesor', contador:'Contador' };
+const STAFF_ROL_LABEL = { admin:'Administrador', profesor:'Profesor', contador:'Contador', aprobador:'Aprobador de finanzas' };
 
 async function renderStaffList(){
   const box = document.getElementById('staffList');
@@ -3268,6 +3270,60 @@ let finMes = todayISO().slice(0,7); // YYYY-MM
 let finTipoFiltro = '';
 let finMovMes = ''; // '' = todos los meses
 let finPrestamoFiltro = 'Activo';
+let finEstadoFiltro = null; // null = aún sin elegir (el aprobador arranca en 'pendiente')
+
+/* Aprobación de movimientos: los administradores registran ingresos,
+   gastos y pagos a socios (quedan "pendiente") y el rol "aprobador" los
+   aprueba o rechaza. Solo lo aprobado cuenta en totales y en la caja.
+   La base de datos lo hace cumplir (supabase_finanzas_aprobacion.sql). */
+const finPuedeEditar = () => CURRENT_USER_ROLE === 'admin';
+const finEsAprobador = () => CURRENT_USER_ROLE === 'aprobador';
+const finEstado = m => m.estado || 'aprobado';
+const movsAprobados = () => STATE.fin.movimientos.filter(m => finEstado(m) === 'aprobado');
+const movsPendientes = () => STATE.fin.movimientos.filter(m => finEstado(m) === 'pendiente');
+const FIN_ESTADO_LABEL = { pendiente:'Pendiente', aprobado:'Aprobado', rechazado:'Rechazado' };
+const FIN_ESTADO_BADGE = { pendiente:'badge-orange', aprobado:'badge-green', rechazado:'badge-red' };
+function finPendientesHtml(){
+  const pend = movsPendientes();
+  if(!pend.length) return '';
+  const entra = sumMonto(pend.filter(m=>m.tipo==='ingreso'));
+  const sale = sumMonto(pend.filter(m=>m.tipo!=='ingreso'));
+  return `
+    <div class="card" style="margin-bottom:18px;border-left:4px solid var(--warn);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;">
+      <div>
+        <div class="cell-strong">${pend.length} movimiento(s) por aprobar</div>
+        <div class="cell-dim">Ingresos <b style="color:var(--ok)">+ ${formatCOP(entra)}</b> · Salidas <b style="color:var(--danger)">− ${formatCOP(sale)}</b> · No cuentan en totales ni en la caja hasta que se aprueben.</div>
+      </div>
+      <button class="btn ${finEsAprobador()?'btn-primary':'btn-outline'} btn-sm" id="finVerPendientes">${finEsAprobador()?'Revisar y aprobar':'Ver pendientes'}</button>
+    </div>`;
+}
+function wireFinPendientes(){
+  const b = document.getElementById('finVerPendientes');
+  if(b) b.onclick = ()=>{ finTab='movimientos'; finEstadoFiltro='pendiente'; finMovMes=''; finTipoFiltro=''; goTo('finanzas'); };
+}
+async function finCambiarEstado(m, estado, motivo){
+  const { data, error } = await sb.from('fin_movimientos')
+    .update({ estado, motivo_rechazo: estado==='rechazado' ? motivo : null })
+    .eq('id', m.id).select().single();
+  if(error){ console.error(error); toast('No se pudo actualizar: ' + error.message); return false; }
+  Object.assign(m, fromRow('fin_movimientos', data));
+  return true;
+}
+function openRechazoModal(m){
+  openModal('Rechazar movimiento', `
+    <p class="cell-dim" style="margin:0 0 12px;">${escapeHtml(FIN_TIPO_LABEL[m.tipo]||m.tipo)} · ${formatDate(m.fecha)} · <b>${formatCOP(m.monto)}</b><br>${escapeHtml(m.concepto||'')}</p>
+    <div class="form-group"><label>Motivo del rechazo</label><textarea id="fr_motivo" rows="3" placeholder="Ej: falta el soporte de pago / el monto no coincide"></textarea></div>
+  `, `
+    <button class="btn btn-outline" id="cancelBtn">Cancelar</button>
+    <button class="btn btn-danger" id="saveBtn">Rechazar</button>
+  `);
+  document.getElementById('cancelBtn').onclick = closeModal;
+  document.getElementById('saveBtn').onclick = async ()=>{
+    const motivo = document.getElementById('fr_motivo').value.trim();
+    if(!motivo){ toast('Escribe el motivo del rechazo'); return; }
+    if(await finCambiarEstado(m, 'rechazado', motivo)){ closeModal(); goTo('finanzas'); toast('Movimiento rechazado'); }
+  };
+}
 
 const FIN_CATEGORIAS = {
   ingreso: ['Mentorías','Clases Excel','Clases Power BI','Software / Suscripciones','Consultoría','Otros ingresos'],
@@ -3371,7 +3427,7 @@ const sumMonto = arr => arr.reduce((s,x)=>s+Number(x.monto||0),0);
 
 function finTotalesMes(ym){
   const enMes = x => !ym || (x.fecha||'').slice(0,7)===ym;
-  const movs = STATE.fin.movimientos.filter(enMes);
+  const movs = movsAprobados().filter(enMes); // solo lo aprobado cuenta
   const ingresos = sumMonto(movs.filter(m=>m.tipo==='ingreso'));
   const gastos = sumMonto(movs.filter(m=>m.tipo==='gasto'));
   const socios = sumMonto(movs.filter(m=>m.tipo==='socio'));
@@ -3390,7 +3446,7 @@ function finCaja(){
 }
 function finSociosResumen(){
   const map = {};
-  STATE.fin.movimientos.filter(m=>m.tipo==='socio').forEach(m=>{
+  movsAprobados().filter(m=>m.tipo==='socio').forEach(m=>{
     const k = (m.socio||'Sin nombre').trim();
     map[k] = map[k] || { socio:k, total:0, ultimo:null, n:0 };
     map[k].total += Number(m.monto||0); map[k].n++;
@@ -3410,10 +3466,15 @@ function RENDER_FINANZAS(){
       </div></div>`;
     return;
   }
+  // El aprobador entra directo a la lista de pendientes (solo la primera vez).
+  if(finEstadoFiltro===null){
+    finEstadoFiltro = finEsAprobador() && movsPendientes().length ? 'pendiente' : '';
+    if(finEstadoFiltro==='pendiente') finTab = 'movimientos';
+  }
   document.getElementById('view').innerHTML = `
     <div class="pill-tabs" style="margin-bottom:18px;">
       <button class="pill-tab ${finTab==='resumen'?'active':''}" data-fintab="resumen">Resumen</button>
-      <button class="pill-tab ${finTab==='movimientos'?'active':''}" data-fintab="movimientos">Movimientos</button>
+      <button class="pill-tab ${finTab==='movimientos'?'active':''}" data-fintab="movimientos">Movimientos${movsPendientes().length ? ` <span class="badge badge-orange" style="margin-left:4px;font-size:10.5px;">${movsPendientes().length} por aprobar</span>` : ''}</button>
       <button class="pill-tab ${finTab==='prestamos'?'active':''}" data-fintab="prestamos">Préstamos</button>
     </div>
     <div id="finBody"></div>
@@ -3441,11 +3502,12 @@ function renderFinResumen(){
   const fila = (label, valor, signo, color) => `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed var(--border);font-size:13px;"><span class="cell-dim" style="font-size:13px;">${label}</span><b style="color:${color||'var(--text)'}">${signo} ${formatCOP(valor)}</b></div>`;
 
   document.getElementById('finBody').innerHTML = `
+    ${finPendientesHtml()}
     <div class="grid grid-2" style="margin-bottom:18px;">
       <div class="card kpi">
         <div class="label">Dinero disponible (caja)</div>
         <div class="value" style="font-size:32px;color:${caja.disponible>=0?'var(--ok)':'var(--danger)'}">${formatCOP(caja.disponible)}</div>
-        <div class="delta">Acumulado de todos los movimientos registrados</div>
+        <div class="delta">Acumulado de los movimientos aprobados</div>
       </div>
       <div class="card">
         <h3 style="margin:0 0 8px;font-size:14px;">¿Cómo se calcula?</h3>
@@ -3493,7 +3555,7 @@ function renderFinResumen(){
             <div><div class="cell-strong">${escapeHtml(s.socio)}</div><div class="cell-dim">${s.n} pago(s) · último ${formatDate(s.ultimo)}</div></div>
             <div class="cell-strong">${formatCOP(s.total)}</div>
           </div>`).join('') : `<div class="empty-state">${ICONS.empty}<div>Aún no hay pagos a socios</div></div>`}
-        <button class="btn btn-outline btn-sm" id="finPagoSocioResumen" style="margin-top:12px;">${ICONS.plus} Registrar pago a socio</button>
+        ${finPuedeEditar() ? `<button class="btn btn-outline btn-sm" id="finPagoSocioResumen" style="margin-top:12px;">${ICONS.plus} Registrar pago a socio</button>` : ''}
       </div>
     </div>
     <div class="grid grid-3" style="margin-bottom:18px;">
@@ -3514,7 +3576,9 @@ function renderFinResumen(){
     </div>
   `;
   document.getElementById('finMesResumen').addEventListener('change', e=>{ if(e.target.value){ finMes = e.target.value; renderFinResumen(); } });
-  document.getElementById('finPagoSocioResumen').onclick = ()=>openMovimientoModal(null, 'socio');
+  const btnSocio = document.getElementById('finPagoSocioResumen');
+  if(btnSocio) btnSocio.onclick = ()=>openMovimientoModal(null, 'socio');
+  wireFinPendientes();
 }
 
 /* ---------- Movimientos (ingresos, gastos y pagos a socios) ---------- */
@@ -3525,13 +3589,14 @@ function renderFinMovimientos(){
   const mesesDisponibles = [...new Set(STATE.fin.movimientos.map(m=>(m.fecha||'').slice(0,7)).filter(Boolean))].sort().reverse();
   if(finMovMes && !mesesDisponibles.includes(finMovMes)) mesesDisponibles.unshift(finMovMes);
   const rows = STATE.fin.movimientos
-    .filter(m=>(!finMovMes || (m.fecha||'').slice(0,7)===finMovMes) && (!finTipoFiltro || m.tipo===finTipoFiltro))
+    .filter(m=>(!finMovMes || (m.fecha||'').slice(0,7)===finMovMes) && (!finTipoFiltro || m.tipo===finTipoFiltro) && (!finEstadoFiltro || finEstado(m)===finEstadoFiltro))
     .sort((a,b)=>(b.fecha||'').localeCompare(a.fecha||'') || (b.createdAt||'').localeCompare(a.createdAt||''));
   const t = finTotalesMes(finMovMes || null);
   const periodo = finMovMes ? mesLabel(finMovMes) : 'todos los meses';
   const neto = t.ingresos - t.gastos - t.socios;
 
   document.getElementById('finBody').innerHTML = `
+    ${finEstadoFiltro==='pendiente' ? '' : finPendientesHtml()}
     <div class="grid grid-4" style="margin-bottom:18px;">
       <div class="card kpi"><div class="label">Ingresos</div><div class="value" style="color:var(--ok)">${formatCOP(t.ingresos)}</div><div class="delta">${periodo}</div></div>
       <div class="card kpi"><div class="label">Gastos</div><div class="value" style="color:var(--danger)">${formatCOP(t.gastos)}</div><div class="delta">${periodo}</div></div>
@@ -3551,16 +3616,20 @@ function renderFinMovimientos(){
             <option value="gasto" ${finTipoFiltro==='gasto'?'selected':''}>Solo gastos</option>
             <option value="socio" ${finTipoFiltro==='socio'?'selected':''}>Solo pagos a socios</option>
           </select>
+          <select class="filter" id="finEstadoMov">
+            <option value="">Todos los estados</option>
+            ${['pendiente','aprobado','rechazado'].map(e=>`<option value="${e}" ${finEstadoFiltro===e?'selected':''}>${e==='pendiente'?'Por aprobar':FIN_ESTADO_LABEL[e]+'s'}</option>`).join('')}
+          </select>
         </div>
-        <div class="toolbar-left">
+        ${finPuedeEditar() ? `<div class="toolbar-left">
           <button class="btn btn-outline btn-sm" data-finnuevo="ingreso">${ICONS.plus} Ingreso</button>
           <button class="btn btn-outline btn-sm" data-finnuevo="gasto">${ICONS.plus} Gasto</button>
           <button class="btn btn-outline btn-sm" data-finnuevo="socio">${ICONS.plus} Pago a socio</button>
-        </div>
+        </div>` : ''}
       </div>
       <div class="table-wrap">
         <table>
-          <thead><tr><th>Fecha</th><th>Tipo</th><th>Categoría / Socio</th><th>Concepto</th><th>Método</th><th style="text-align:right;">Monto</th><th></th></tr></thead>
+          <thead><tr><th>Fecha</th><th>Tipo</th><th>Categoría / Socio</th><th>Concepto</th><th>Método</th><th style="text-align:right;">Monto</th><th>Estado</th><th></th></tr></thead>
           <tbody>
             ${rows.length ? rows.map(m=>`
               <tr>
@@ -3570,11 +3639,19 @@ function renderFinMovimientos(){
                 <td class="cell-dim">${escapeHtml(m.concepto||'')}</td>
                 <td class="cell-dim">${escapeHtml(m.metodoPago||'—')}</td>
                 <td class="cell-strong" style="text-align:right;color:${m.tipo==='ingreso'?'var(--ok)':m.tipo==='socio'?'var(--accent)':'var(--danger)'}">${m.tipo==='ingreso'?'+':'−'} ${formatCOP(m.monto)}</td>
+                <td>
+                  <span class="badge ${FIN_ESTADO_BADGE[finEstado(m)]}"><span class="badge-dot"></span>${FIN_ESTADO_LABEL[finEstado(m)]}</span>
+                  ${finEstado(m)==='rechazado' && m.motivoRechazo ? `<div class="cell-dim" style="font-size:11.5px;margin-top:3px;max-width:220px;">${escapeHtml(m.motivoRechazo)}</div>` : ''}
+                  ${finEstado(m)!=='pendiente' && m.aprobadoPor ? `<div class="cell-dim" style="font-size:11px;margin-top:2px;">por ${escapeHtml(m.aprobadoPor)}</div>` : ''}
+                </td>
                 <td><div class="row-actions">
-                  <button class="icon-btn" data-finmov-edit="${m.id}">${ICONS.edit}</button>
-                  <button class="icon-btn danger" data-finmov-del="${m.id}">${ICONS.trash}</button>
+                  ${finPuedeEditar() ? `
+                  <button class="icon-btn" data-finmov-edit="${m.id}" title="Editar">${ICONS.edit}</button>
+                  ${finEstado(m)!=='aprobado' ? `<button class="icon-btn danger" data-finmov-del="${m.id}" title="Eliminar">${ICONS.trash}</button>` : ''}` : ''}
+                  ${finEsAprobador() && finEstado(m)!=='aprobado' ? `<button class="btn btn-primary btn-sm" data-finmov-aprobar="${m.id}">${ICONS.check} Aprobar</button>` : ''}
+                  ${finEsAprobador() && finEstado(m)!=='rechazado' ? `<button class="btn btn-outline btn-sm" data-finmov-rechazar="${m.id}" style="color:var(--danger);">${finEstado(m)==='aprobado' ? 'Revertir' : 'Rechazar'}</button>` : ''}
                 </div></td>
-              </tr>`).join('') : `<tr><td colspan="7"><div class="empty-state">${ICONS.empty}<div>No hay movimientos con estos filtros</div></div></td></tr>`}
+              </tr>`).join('') : `<tr><td colspan="8"><div class="empty-state">${ICONS.empty}<div>No hay movimientos con estos filtros</div></div></td></tr>`}
           </tbody>
         </table>
       </div>
@@ -3583,11 +3660,22 @@ function renderFinMovimientos(){
   `;
   document.getElementById('finMesMov').addEventListener('change', e=>{ finMovMes = e.target.value; renderFinMovimientos(); });
   document.getElementById('finTipoMov').addEventListener('change', e=>{ finTipoFiltro = e.target.value; renderFinMovimientos(); });
+  document.getElementById('finEstadoMov').addEventListener('change', e=>{ finEstadoFiltro = e.target.value; renderFinMovimientos(); });
+  wireFinPendientes();
+  document.querySelectorAll('[data-finmov-aprobar]').forEach(b=>b.addEventListener('click', async ()=>{
+    const m = STATE.fin.movimientos.find(x=>x.id===b.dataset.finmovAprobar);
+    b.disabled = true;
+    if(await finCambiarEstado(m, 'aprobado')){ goTo('finanzas'); toast('Movimiento aprobado'); } else b.disabled = false;
+  }));
+  document.querySelectorAll('[data-finmov-rechazar]').forEach(b=>b.addEventListener('click', ()=>{
+    openRechazoModal(STATE.fin.movimientos.find(x=>x.id===b.dataset.finmovRechazar));
+  }));
   document.querySelectorAll('[data-finnuevo]').forEach(b=>b.onclick = ()=>openMovimientoModal(null, b.dataset.finnuevo));
   document.querySelectorAll('[data-finmov-edit]').forEach(b=>b.addEventListener('click', ()=>openMovimientoModal(b.dataset.finmovEdit)));
   document.querySelectorAll('[data-finmov-del]').forEach(b=>b.addEventListener('click', ()=>{
     confirmDialog('¿Eliminar este movimiento?', async ()=>{
-      await dbDelete('fin_movimientos', b.dataset.finmovDel);
+      const { error } = await sb.from('fin_movimientos').delete().eq('id', b.dataset.finmovDel);
+      if(error){ console.error(error); toast('No se pudo eliminar: ' + error.message); return; }
       STATE.fin.movimientos = STATE.fin.movimientos.filter(x=>x.id!==b.dataset.finmovDel);
       renderFinMovimientos(); toast('Movimiento eliminado');
     });
@@ -3621,6 +3709,9 @@ function openMovimientoModal(id, tipoDefault){
       <select id="fm_metodo">${FIN_METODOS.map(x=>`<option ${m.metodoPago===x?'selected':''}>${x}</option>`).join('')}</select>
     </div>
     <div class="form-group"><label>Notas</label><textarea id="fm_notas" rows="2">${escapeHtml(m.notas||'')}</textarea></div>
+    <p class="form-hint" style="margin-top:4px;">${editing && finEstado(m)==='aprobado'
+      ? '⚠️ Este movimiento ya está aprobado: si cambias tipo, fecha, categoría, socio, concepto, monto o método, vuelve a quedar <b>pendiente de aprobación</b>.'
+      : 'El movimiento queda <b>pendiente de aprobación</b> y no cuenta en los totales hasta que el aprobador lo apruebe.'}</p>
   `, `
     <button class="btn btn-outline" id="cancelBtn">Cancelar</button>
     <button class="btn btn-primary" id="saveBtn">${ICONS.check} Guardar</button>
@@ -3651,7 +3742,12 @@ function openMovimientoModal(id, tipoDefault){
       metodoPago: document.getElementById('fm_metodo').value,
       notas: document.getElementById('fm_notas').value.trim() || null,
     };
-    if(editing){ await dbUpdate('fin_movimientos', m.id, data); Object.assign(m, data); }
+    if(editing){
+      // .select() devuelve la fila como quedó (el servidor la regresa a "pendiente" si cambió algo importante)
+      const { data: fila, error } = await sb.from('fin_movimientos').update(toRow('fin_movimientos', data)).eq('id', m.id).select().single();
+      if(error){ console.error(error); toast('Error actualizando el movimiento: ' + error.message); return; }
+      Object.assign(m, fromRow('fin_movimientos', fila));
+    }
     else { const created = await dbInsert('fin_movimientos', {id:uid(), ...data, createdBy: CURRENT_USER_EMAIL}); STATE.fin.movimientos.push(created); }
     closeModal();
     if(finTab!=='resumen') finTab = 'movimientos';
@@ -3659,7 +3755,8 @@ function openMovimientoModal(id, tipoDefault){
     if(finMovMes && finMovMes!==data.fecha.slice(0,7)) finMovMes = '';
     if(finTipoFiltro && finTipoFiltro!==tipo) finTipoFiltro = '';
     goTo('finanzas');
-    toast(editing ? 'Movimiento actualizado' : (tipo==='gasto' ? 'Gasto registrado' : tipo==='socio' ? 'Pago a socio registrado' : 'Ingreso registrado'));
+    const quedoPendiente = !editing || finEstado(m)==='pendiente';
+    toast((editing ? 'Movimiento actualizado' : (tipo==='gasto' ? 'Gasto registrado' : tipo==='socio' ? 'Pago a socio registrado' : 'Ingreso registrado')) + (quedoPendiente ? ' · pendiente de aprobación' : ''));
   };
 }
 
@@ -3707,11 +3804,13 @@ function renderFinPrestamos(){
                 <td>${info.pagadas.size} / ${info.causadas}</td>
                 <td>${prestamoEstadoBadge(p, info)}</td>
                 <td><div class="row-actions">
+                  ${!finPuedeEditar() ? `<button class="icon-btn" data-pr-ver="${p.id}" title="Ver detalle">${ICONS.reportes||ICONS.edit}</button>` : ''}
+                  ${finPuedeEditar() ? `
                   ${p.estado!=='Pagado' ? `<button class="btn btn-outline btn-sm" data-pr-interes="${p.id}" title="Registrar pago de interés">+ Interés</button>
                   <button class="btn btn-outline btn-sm" data-pr-capital="${p.id}" title="Registrar pago total del capital y finalizar">Pagar capital</button>` : ''}
                   <button class="icon-btn" data-pr-ver="${p.id}" title="Ver detalle">${ICONS.reportes||ICONS.edit}</button>
                   <button class="icon-btn" data-pr-edit="${p.id}" title="Editar">${ICONS.edit}</button>
-                  <button class="icon-btn danger" data-pr-del="${p.id}" title="Eliminar">${ICONS.trash}</button>
+                  <button class="icon-btn danger" data-pr-del="${p.id}" title="Eliminar">${ICONS.trash}</button>` : ''}
                 </div></td>
               </tr>`;
             }).join('') : `<tr><td colspan="9"><div class="empty-state">${ICONS.empty}<div>No hay préstamos con este filtro</div></div></td></tr>`}
@@ -3896,7 +3995,7 @@ function openPrestamoDetalle(prestamoId){
           <td>${x.tipo==='capital' ? '<b>Capital</b>' : 'Interés · cuota ' + (x.periodo||'—')}</td>
           <td class="cell-strong">${formatCOP(x.monto)}</td>
           <td class="cell-dim">${escapeHtml(x.notas||'')}</td>
-          <td><button class="icon-btn danger" data-pago-del="${x.id}" title="Eliminar pago">${ICONS.trash}</button></td>
+          <td>${finPuedeEditar() ? `<button class="icon-btn danger" data-pago-del="${x.id}" title="Eliminar pago">${ICONS.trash}</button>` : ''}</td>
         </tr>`).join('') : '<tr><td colspan="5" class="cell-dim">Sin pagos todavía.</td></tr>'}
       </tbody>
     </table></div>
@@ -4019,10 +4118,8 @@ async function initApp(session){
   document.getElementById('companyNameLabel').textContent = STATE.config.empresa;
   appInitialized = true;
   showApp();
-  CURRENT_VIEW = 'dashboard';
-  renderNav();
-  renderQuickAdd();
-  RENDER_DASHBOARD();
+  // Cada rol arranca en su primera vista permitida (admin: Dashboard; aprobador: Finanzas).
+  goTo(allowedViews()[0]);
 }
 
 document.getElementById('authForm').addEventListener('submit', async (e)=>{

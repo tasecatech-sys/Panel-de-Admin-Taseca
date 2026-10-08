@@ -33,7 +33,7 @@ function json(obj: unknown, status = 200) {
   });
 }
 
-const ROLES_VALIDOS = ['admin', 'profesor', 'contador'];
+const ROLES_VALIDOS = ['admin', 'profesor', 'contador', 'aprobador'];
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: CORS_HEADERS });
