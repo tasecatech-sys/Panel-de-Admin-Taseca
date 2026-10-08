@@ -13,7 +13,9 @@
 --  2) Vista "gcal_citas": la ÚNICA definición de "qué es una cita" para
 --     la sincronización, uniendo las dos tablas reales:
 --       · horarios → franja con estado <> 'libre' y con cliente_id
---       · agenda   → cualquier evento con estado <> 'Cancelada'
+--       · agenda   → evento con estado <> 'Cancelada' que NO sea el
+--                    gemelo de una franja (misma fecha, hora y clase):
+--                    en las clases de estudiantes manda horarios
 --
 --  3) Triggers en "horarios" y "agenda": cuando una cita se crea,
 --     cambia o se cancela/borra, la anotan en gcal_sync (en la misma
@@ -110,7 +112,20 @@ union all
 select
   'agenda'::text,
   a.id,
-  (a.estado is distinct from 'Cancelada'),
+  -- Activa si no está cancelada Y no es el "gemelo" de una franja de
+  -- Plan de Estudio: reservar_franja_v2 guarda cada reserva en horarios
+  -- Y en agenda. Para no duplicar el evento, en las clases de
+  -- estudiantes manda la franja (horarios); agenda solo sincroniza lo
+  -- que no tiene franja (demos, reuniones, soporte, clases manuales).
+  (a.estado is distinct from 'Cancelada'
+   and not exists (
+     select 1 from public.horarios h
+      where h.fecha::date = a.fecha::date
+        and left(h.hora::text, 5) = left(a.hora::text, 5)
+        and a.tipo = 'Clase ' || case h.plataforma::text when 'excel' then 'Excel'
+                                                         when 'powerbi' then 'Power BI'
+                                                         else coalesce(h.plataforma::text, '') end
+        and (h.cliente_id = a.cliente_id or h.cliente_id is null))),
   a.fecha::date,
   left(a.hora::text, 8),
   coalesce(nullif(regexp_replace(a.duracion::text, '\D', '', 'g'), '')::int, 60),
