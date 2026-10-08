@@ -169,6 +169,25 @@ begin
   assert (select estado from gcal_sync where origen='horarios' and registro_id=v_fr2) = 'pendiente', 'P11b: verificación completa';
   assert (select gcal_event_id from gcal_sync where origen='horarios' and registro_id=v_fr2) = 'evt_456', 'P11b: conserva el event_id';
 
+  -- ---------------------------------------------------------------
+  -- P12. GEMELO EN AGENDA: reservar_franja_v2 guarda la reserva en
+  --      horarios Y en agenda → solo la franja genera evento
+  -- ---------------------------------------------------------------
+  insert into horarios (fecha, hora, plataforma, profesor, duracion, modalidad, estado, cliente_id)
+  values (v_hoy + 6, '16:00', 'excel', 'profe@taseca.tech', 60, 'Virtual', 'reservado', v_cli)
+  returning id into v_fr2;
+  insert into agenda (cliente_id, tipo, fecha, hora, duracion, modalidad, estado)
+  values (v_cli, 'Clase Excel', v_hoy + 6, '16:00', '60 min', 'Virtual', 'Programada') returning id into v_ag;
+  assert (select activa from gcal_citas where origen='horarios' and registro_id=v_fr2), 'P12: la franja manda';
+  assert not (select activa from gcal_citas where origen='agenda' and registro_id=v_ag), 'P12: el gemelo de agenda no duplica';
+  -- Reagendar libera la franja: el gemelo de agenda sigue sin generar evento
+  update horarios set estado = 'libre', cliente_id = null where id = v_fr2;
+  assert not (select activa from gcal_citas where origen='agenda' and registro_id=v_ag), 'P12: gemelo tras reagendar';
+  -- Una reunión manual a la misma hora SÍ se sincroniza (no es clase de esa plataforma)
+  insert into agenda (cliente_id, tipo, fecha, hora, duracion, modalidad, estado)
+  values (v_cli, 'Reunión', v_hoy + 6, '16:00', '30 min', 'Virtual', 'Programada') returning id into v_ag;
+  assert (select activa from gcal_citas where origen='agenda' and registro_id=v_ag), 'P12: reunión manual sí sincroniza';
+
   raise notice '✅ TODAS LAS PRUEBAS PASARON';
 end $$;
 
