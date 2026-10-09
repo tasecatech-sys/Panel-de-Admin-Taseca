@@ -401,6 +401,61 @@ select.filter, input.filter{
 .auth-loading.hidden{display:none;}
 #appShell.hidden{display:none;}
 
+/* ---------- móvil / responsive ---------- */
+.menu-btn{display:none;width:38px;height:38px;border-radius:10px;border:1px solid var(--border);background:var(--panel);align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:var(--text);}
+.menu-btn svg{width:20px;height:20px;}
+.topbar-title{display:flex;align-items:center;gap:12px;min-width:0;}
+.sidebar-backdrop{display:none;}
+@media(max-width:768px){
+  #appShell{display:block !important;}
+  #appShell.hidden{display:none !important;}
+  #sidebar{position:fixed;left:0;top:0;height:100%;transform:translateX(-100%);transition:transform .25s ease;z-index:60;box-shadow:none;}
+  body.nav-open #sidebar{transform:translateX(0);box-shadow:0 0 40px rgba(0,0,0,.35);}
+  .sidebar-backdrop{position:fixed;inset:0;background:rgba(15,18,35,.45);z-index:55;}
+  body.nav-open .sidebar-backdrop{display:block;}
+  body.nav-open{overflow:hidden;}
+  .menu-btn{display:inline-flex;}
+  #main{width:100%;}
+  #topbar{flex-wrap:wrap;gap:10px;padding:12px 14px;}
+  #topbar h1{font-size:17px;}
+  .top-actions{width:100%;}
+  .search-box{flex:1;min-width:0;}
+  #quickAddBtn{padding:8px 12px;}
+  #view{padding:14px 12px 50px;}
+  .grid{gap:12px;}
+  .grid-4{grid-template-columns:repeat(2,minmax(0,1fr));}
+  .card{padding:14px;}
+  .kpi{padding:14px;}
+  .kpi .value{font-size:clamp(16px,5vw,22px);word-break:break-word;}
+  .pill-tabs{width:100%;overflow-x:auto;}
+  .pill-tab{flex:1 1 auto;white-space:nowrap;padding:7px 8px;}
+  .pill-tabs{flex-wrap:wrap;overflow:visible;}
+  .toolbar{flex-direction:column;align-items:stretch;}
+  .toolbar-left{width:100%;}
+  .toolbar-left .filter,.toolbar-left select{flex:1 1 140px;min-width:0;}
+  .form-row{grid-template-columns:1fr;}
+  .overlay{padding:10px;align-items:flex-end;}
+  .modal{max-height:92vh;border-radius:16px 16px 12px 12px;}
+  .modal-foot{flex-wrap:wrap;}
+
+  /* tablas -> tarjetas apiladas */
+  .table-wrap table,.table-wrap tbody,.table-wrap tr,.table-wrap td{display:block;width:100%;}
+  .table-wrap thead{display:none;}
+  .table-wrap tr{border:1px solid var(--border);border-radius:12px;padding:6px 12px;margin-bottom:10px;background:var(--panel);}
+  .table-wrap td{border-bottom:1px dashed var(--border);padding:8px 0;display:flex;justify-content:space-between;align-items:flex-start;gap:12px;text-align:right !important;}
+  .table-wrap td:last-child{border-bottom:none;}
+  .table-wrap td[data-label]::before{content:attr(data-label);font-size:11.5px;font-weight:700;color:var(--text-dim);text-align:left;flex-shrink:0;max-width:45%;}
+  .table-wrap td:not([data-label]),.table-wrap td[data-label=""]{display:block;text-align:left !important;}
+  .table-wrap td[data-label=""]::before{content:none;}
+  .table-wrap td > div[style*="max-width"]{margin-left:auto;}
+  .row-actions{flex-wrap:wrap;justify-content:flex-end;width:100%;}
+  .row-actions .btn{flex:1 1 auto;justify-content:center;padding:9px 12px;font-size:13px;}
+  .row-actions .btn svg{width:16px;height:16px;flex-shrink:0;}
+}
+@media(max-width:380px){
+  .grid-4{grid-template-columns:1fr;}
+}
+
 /* ---------- calendario de agenda ---------- */
 .cal-nav{display:flex;align-items:center;gap:6px;}
 .cal-nav-label{font-size:14px;font-weight:700;text-transform:capitalize;min-width:150px;text-align:center;}
@@ -479,12 +534,16 @@ select.filter, input.filter{
       <div style="margin-top:10px;">v1.1 · Datos sincronizados con Supabase</div>
     </div>
   </aside>
+  <div class="sidebar-backdrop" id="sidebarBackdrop"></div>
 
   <div id="main">
     <div id="topbar">
-      <div>
-        <h1 id="viewTitle">Dashboard</h1>
-        <div class="sub" id="viewSub">Resumen general del negocio</div>
+      <div class="topbar-title">
+        <button class="menu-btn" id="menuBtn" aria-label="Abrir menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
+        <div style="min-width:0;">
+          <h1 id="viewTitle">Dashboard</h1>
+          <div class="sub" id="viewSub">Resumen general del negocio</div>
+        </div>
       </div>
       <div class="top-actions">
         <div class="search-box">
@@ -941,6 +1000,7 @@ function goTo(view){
   document.getElementById('viewSub').textContent = meta.sub;
   renderNav();
   renderQuickAdd();
+  document.body.classList.remove('nav-open');
   RENDERERS[view]();
 }
 
@@ -4163,6 +4223,25 @@ sb.auth.onAuthStateChange((event, session)=>{
 });
 
 document.getElementById('brandMarkAuth').innerHTML = TASECA_LOGO_SVG;
+
+/* =========================================================
+   MÓVIL: menú lateral y etiquetas de tablas
+========================================================= */
+document.getElementById('menuBtn').addEventListener('click', ()=> document.body.classList.toggle('nav-open'));
+document.getElementById('sidebarBackdrop').addEventListener('click', ()=> document.body.classList.remove('nav-open'));
+function labelTables(root){
+  root.querySelectorAll('.table-wrap table').forEach(t=>{
+    const heads = [...t.querySelectorAll('thead th')].map(th=>th.textContent.trim());
+    if(!heads.length) return;
+    t.querySelectorAll('tbody tr').forEach(tr=>{
+      [...tr.children].forEach((td,i)=>{
+        if(td.tagName!=='TD' || td.hasAttribute('colspan')) return;
+        if(td.dataset.label===undefined) td.dataset.label = heads[i]||'';
+      });
+    });
+  });
+}
+new MutationObserver(()=>labelTables(document)).observe(document.body,{childList:true,subtree:true});
 document.getElementById('brandMarkSidebar').innerHTML = TASECA_LOGO_SVG;
 
 (async function boot(){
